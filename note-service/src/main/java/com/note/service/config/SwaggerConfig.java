@@ -1,6 +1,6 @@
 package com.note.service.config;
 
-
+//day02
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.Contact;

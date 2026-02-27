@@ -1,3 +1,4 @@
+//day02
 package com.note.service.dto;
 
 import lombok.Data;

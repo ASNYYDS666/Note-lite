@@ -1,3 +1,4 @@
+//day02
 package com.note.service.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;

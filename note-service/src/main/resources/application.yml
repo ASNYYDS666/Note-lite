@@ -8,3 +8,7 @@ spring:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
+
+jwt:
+  secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
+  expiration: 86400000  # 24小时，单位毫秒

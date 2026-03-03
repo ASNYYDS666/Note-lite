@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.5</version>
+		<version>3.2.6</version>
 		<relativePath/>
 	</parent>
 
@@ -105,10 +105,33 @@
 		</dependency>
 
 		<!-- 参数校验（若 Day1 未加） -->
+
+
+		<!--添加Redis依赖-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-pool2</artifactId>
+		</dependency>
+
+
+
+<!--		&lt;!&ndash; SLF4J API &ndash;&gt;-->
+<!--		<dependency>-->
+<!--			<groupId>org.slf4j</groupId>-->
+<!--			<artifactId>slf4j-api</artifactId>-->
+<!--			<version>2.0.12</version>-->
+<!--		</dependency>-->
+
+<!--		&lt;!&ndash; 绑定具体日志实现（推荐 Logback） &ndash;&gt;-->
+<!--		<dependency>-->
+<!--			<groupId>ch.qos.logback</groupId>-->
+<!--			<artifactId>logback-classic</artifactId>-->
+<!--			<version>1.5.6</version>-->
+<!--		</dependency>-->
 	</dependencies>
 
 	<build>

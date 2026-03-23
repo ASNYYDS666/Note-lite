@@ -18,6 +18,7 @@
     "axios": "^1.13.6",
     "element-plus": "^2.13.3",
     "highlight.js": "^11.11.1",
+    "lodash-es": "^4.17.23",
     "marked": "^17.0.3",
     "pinia": "^3.0.4",
     "vue": "^3.5.29",

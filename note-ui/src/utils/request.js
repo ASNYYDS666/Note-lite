@@ -30,22 +30,42 @@ request.interceptors.response.use(
     (response) => {
         const res = response.data
         // 你的 Result 包装格式：{ code, message, data }
-        if (res.code !== 200) {
-            ElMessage.error(res.message || '请求失败')
-            return Promise.reject(new Error(res.message))
+        // 成功响应（200）
+        if (res.code === 200) {
+            return res.data//只返回data部分
         }
-        return res
+        // 业务错误（400，401，404）
+        const message=res.message || '请求失败'
+        ElMessage.error(message)
+
+        // 401令牌过期
+        if (res.code === 401){
+            const userStore=useUserStore()
+            userStore.logout()
+            router.push("/login")
+        }
+
+        return Promise.reject({
+            code:res.code,
+            message:message,
+            data:res.data
+        })
     },
     (error) => {
         const { response } = error
+        if (!response) {
+            // 网络完全断开，只弹一次
+            ElMessage.error({ message: '网络连接失败，请检查后端服务', grouping: true })
+            return Promise.reject(error)
+        }
 
-        if (response?.status === 401) {
+        if (response?.status === 401 || response?.status=== 403) {
             ElMessage.error('登录已过期，请重新登录')
             const userStore = useUserStore()
             userStore.logout()
             router.push('/login')
         } else {
-            ElMessage.error(response?.data?.message || '网络错误')
+            ElMessage.error({ message: response?.data?.message || '请求失败', grouping: true })
         }
 
         return Promise.reject(error)

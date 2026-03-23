@@ -7,6 +7,9 @@
         <el-form-item prop="username">
           <el-input v-model="registerForm.username" placeholder="用户名" />
         </el-form-item>
+        <el-form-item prop="email">
+          <el-input v-model="registerForm.email" placeholder="邮箱" />
+        </el-form-item>
         <el-form-item prop="password">
           <el-input v-model="registerForm.password" type="password" placeholder="密码" />
         </el-form-item>
@@ -34,6 +37,7 @@ const formRef = ref(null)
 
 const registerForm = reactive({
   username: '',
+  email:'',//新增邮箱校验
   password: '',
   confirmPassword: ''
 })
@@ -53,6 +57,10 @@ const rules = {
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
   ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
@@ -63,17 +71,41 @@ const rules = {
   ]
 }
 
+// const handleRegister = async () => {
+//   if (!formRef.value) return
+//
+//   await formRef.value.validate((valid) => {
+//     if (valid) {
+//       // TODO: 调用注册接口
+//       ElMessage.success('注册成功')
+//       router.push('/login')
+//     }
+//   })
+// }
+
+import request from '@/utils/request'
+//注册接口的完善
 const handleRegister = async () => {
   if (!formRef.value) return
 
-  await formRef.value.validate((valid) => {
+  await formRef.value.validate(async (valid) => {
     if (valid) {
-      // TODO: 调用注册接口
-      ElMessage.success('注册成功')
-      router.push('/login')
+      try {
+        const res = await request.post('/ums/register', {
+          username: registerForm.username,
+          email: registerForm.email,
+          password: registerForm.password
+        })
+        ElMessage.success('注册成功，请登录')
+        router.push('/login')
+      } catch (error) {
+        // 错误已在拦截器处理
+        console.error('注册失败:', error)
+      }
     }
   })
 }
+
 </script>
 
 <style scoped>

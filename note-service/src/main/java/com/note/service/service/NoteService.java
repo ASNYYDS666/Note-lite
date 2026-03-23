@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
@@ -110,15 +111,29 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
     // ========== 分页查询 ==========
 
+    /**
+     * 分页查询笔记列表（支持标签筛选）
+     */
     public Page<NoteEntity> pageQuery(Long userId, NoteQueryDTO query) {
+        // 如果没有标签筛选，走原来的简单查询（性能更好）
+        if (query.getTags() == null || query.getTags().isEmpty()) {
+            return simplePageQuery(userId, query);
+        }
+
+        // 有标签筛选：使用手动分页
+        return tagFilterPageQuery(userId, query);
+    }
+
+    /**
+     * 简单分页查询（无标签筛选）- 复用原有逻辑
+     */
+    private Page<NoteEntity> simplePageQuery(Long userId, NoteQueryDTO query) {
         Page<NoteEntity> page = new Page<>(query.getPageNum(), query.getPageSize());
 
-        // 简单实现：先查主表，再组装标签（避免复杂 SQL）
         QueryWrapper<NoteEntity> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId)
                 .eq("is_deleted", query.getIsDeleted());
 
-        // 关键词搜索（仅标题）
         if (StringUtils.hasText(query.getKeyword())) {
             wrapper.like("title", query.getKeyword());
         }
@@ -126,14 +141,81 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         wrapper.orderByDesc("updated_at");
         page = baseMapper.selectPage(page, wrapper);
 
-        // 批量组装标签（可优化为批量查询，当前逐条）
-        page.getRecords().forEach(note -> {
-            List<String> tags = noteTagMapper.selectTagsByNoteId(note.getId());
-            note.setTags(tags);
-        });
+        // 组装标签
+        if (page.getRecords() != null) {
+            page.getRecords().forEach(note -> {
+                List<String> tags = noteTagMapper.selectTagsByNoteId(note.getId());
+                note.setTags(tags);
+            });
+        }
 
         return page;
     }
+
+    /**
+     * 标签筛选分页查询（手动分页解决 COUNT 问题）
+     */
+    private Page<NoteEntity> tagFilterPageQuery(Long userId, NoteQueryDTO query) {
+        // 计算分页参数
+        long offset = (long) (query.getPageNum() - 1) * query.getPageSize();
+        long limit = query.getPageSize();
+
+        // 1. 查询当前页的数据
+        List<NoteEntity> records = baseMapper.selectWithTags(
+                userId,
+                query.getIsDeleted(),
+                query.getKeyword(),
+                query.getTags(),
+                query.getTagMatch(),
+                offset,
+                limit
+        );
+
+        // 2. 解析 tagNames 到 tags 列表
+        if (records != null) {
+            records.forEach(NoteEntity::parseTagNames);
+        }
+
+        // 3. 查询总记录数
+        long total = baseMapper.countWithTags(
+                userId,
+                query.getIsDeleted(),
+                query.getKeyword(),
+                query.getTags(),
+                query.getTagMatch()
+        );
+
+        // 4. 手动组装 Page 对象
+        Page<NoteEntity> page = new Page<>(query.getPageNum(), query.getPageSize(), total);
+        page.setRecords(records != null ? records : new ArrayList<>());
+
+        return page;
+    }
+//    // 这是原有的分页查询方法（day05步骤二指出有错误，替换为以下新的）
+//    public Page<NoteEntity> pageQuery(Long userId, NoteQueryDTO query) {
+//        Page<NoteEntity> page = new Page<>(query.getPageNum(), query.getPageSize());
+//
+//        // 简单实现：先查主表，再组装标签（避免复杂 SQL）
+//        QueryWrapper<NoteEntity> wrapper = new QueryWrapper<>();
+//        wrapper.eq("user_id", userId)
+//                .eq("is_deleted", query.getIsDeleted());
+//
+//        // 关键词搜索（仅标题）
+//        if (StringUtils.hasText(query.getKeyword())) {
+//            wrapper.like("title", query.getKeyword());
+//        }
+//
+//        wrapper.orderByDesc("updated_at");
+//        page = baseMapper.selectPage(page, wrapper);
+//
+//        // 批量组装标签（可优化为批量查询，当前逐条）
+//        page.getRecords().forEach(note -> {
+//            List<String> tags = noteTagMapper.selectTagsByNoteId(note.getId());
+//            note.setTags(tags);
+//        });
+//
+//        return page;
+//    }
 
     // ========== 工具方法 ==========
 
@@ -170,5 +252,69 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
                 .trim();
 
         return plain.length() > 200 ? plain.substring(0, 200) + "..." : plain;
+    }
+
+    // ========== 回收站相关 ==========
+
+    /**
+     * 从回收站恢复笔记
+     */
+    @Transactional
+    public void restoreFromRecycle(Long noteId, Long userId) {
+        NoteEntity note = baseMapper.selectById(noteId);
+        if (note == null || !note.getUserId().equals(userId)) {
+            throw new BusinessException(403, "无权操作");
+        }
+        if (note.getIsDeleted() != 1) {
+            throw new BusinessException(400, "笔记不在回收站");
+        }
+
+        note.setIsDeleted(0);
+        note.setDeletedAt(null);
+        baseMapper.updateById(note);
+        log.info("恢复笔记: noteId={}", noteId);
+    }
+
+    /**
+     * 清空回收站（物理删除所有回收站笔记）
+     */
+    @Transactional
+    public void clearRecycle(Long userId) {
+        QueryWrapper<NoteEntity> wrapper = new QueryWrapper<>();
+        wrapper.eq("user_id", userId).eq("is_deleted", 1);
+
+        List<NoteEntity> recycleNotes = baseMapper.selectList(wrapper);
+        for (NoteEntity note : recycleNotes) {
+            // 物理删除笔记（同时删除标签）
+            baseMapper.deleteById(note.getId());
+            noteTagMapper.delete(new QueryWrapper<NoteTagEntity>().eq("note_id", note.getId()));
+        }
+        log.info("清空回收站: userId={}, count={}", userId, recycleNotes.size());
+    }
+
+    /**
+     * 获取回收站列表
+     */
+    public Page<NoteEntity> pageRecycle(Long userId, NoteQueryDTO query) {
+        Page<NoteEntity> page = new Page<>(query.getPageNum(), query.getPageSize());
+
+        QueryWrapper<NoteEntity> wrapper = new QueryWrapper<>();
+        wrapper.eq("user_id", userId)
+                .eq("is_deleted", 1)
+                .orderByDesc("deleted_at");  // 按删除时间倒序
+
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.like("title", query.getKeyword());
+        }
+
+        page = baseMapper.selectPage(page, wrapper);
+
+        // 组装标签
+        page.getRecords().forEach(note -> {
+            List<String> tags = noteTagMapper.selectTagsByNoteId(note.getId());
+            note.setTags(tags);
+        });
+
+        return page;
     }
 }

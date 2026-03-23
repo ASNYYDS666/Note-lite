@@ -4,7 +4,8 @@ import { ref, computed } from 'vue'
 export const useUserStore = defineStore('user', () => {
     // State
     const token = ref(localStorage.getItem('token') || '')
-    const userInfo = ref(null)
+    // const userInfo = ref(null)
+    const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
 
     // Getters
     const isLoggedIn = computed(() => !!token.value)
@@ -17,12 +18,14 @@ export const useUserStore = defineStore('user', () => {
 
     const setUserInfo = (info) => {
         userInfo.value = info
+        localStorage.setItem('userInfo',JSON.stringify(info))//持久化
     }
 
     const logout = () => {
         token.value = ''
         userInfo.value = null
         localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
     }
 
     return {

@@ -81,10 +81,10 @@ const handleLogin = async () => {
     })
 
     // 假设登录返回：{ token, userId, username }
-    userStore.setToken(res.data.token)
+    userStore.setToken(res.token)
     userStore.setUserInfo({
-      userId: res.data.userId,
-      username: res.data.username
+      userId: res.userId,
+      username: res.username
     })
 
     ElMessage.success('登录成功')

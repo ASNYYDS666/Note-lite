@@ -25,6 +25,12 @@ const routes = [
                 component: () => import('@/views/NoteList.vue')
             },
             {
+                //day05更新路由配置：添加回收站到Layout的子路由中
+                path:'recycle',
+                name:'RecycleBin',
+                component: ()=> import('@/views/RecycleBin.vue')
+            },
+            {
                 path: 'note/new',
                 name: 'NoteCreate',
                 component: () => import('@/views/NoteEdit.vue')

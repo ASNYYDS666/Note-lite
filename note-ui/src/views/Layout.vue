@@ -19,6 +19,10 @@
             <el-icon><Document /></el-icon>
             <span>我的笔记</span>
           </el-menu-item>
+          <el-menu-item index="/recycle">  <!-- day05新增 -->
+            <el-icon><Delete /></el-icon>
+            <span>回收站</span>
+          </el-menu-item>
           <el-menu-item index="/note/new">
             <el-icon><Plus /></el-icon>
             <span>新建笔记</span>
@@ -36,8 +40,9 @@
 <script setup>
 import { useUserStore } from '@/store/user'
 import { useRouter } from 'vue-router'
-import { Document, Plus } from '@element-plus/icons-vue'
+import { Document, Plus , Delete} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+
 
 const userStore = useUserStore()
 const router = useRouter()

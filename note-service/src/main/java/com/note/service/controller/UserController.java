@@ -31,6 +31,7 @@ import com.note.service.dto.LoginDTO;
 import com.note.service.dto.UserRegisterDTO;
 import com.note.service.entity.UserEntity;
 import com.note.service.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -51,9 +52,11 @@ public class UserController {
     private JwtUtils jwtUtils;
 
     @PostMapping("/register")
+    @Operation(summary="用户注册")
     public Result<String> register(@RequestBody @Valid UserRegisterDTO dto) {
         userService.register(dto);
         return Result.success("注册成功");
+
     }
 
     @PostMapping("/login")
@@ -70,6 +73,7 @@ public class UserController {
 
         return Result.success(result);
     }
+
 
     @GetMapping("/info")
     public Result<UserEntity> getUserInfo() {

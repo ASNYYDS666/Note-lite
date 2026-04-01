@@ -317,4 +317,19 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
         return page;
     }
+
+    /**
+     * 获取笔记详情（无需权限，用于分享）
+     */
+    public NoteEntity getDetailWithoutAuth(Long noteId) {
+        NoteEntity note = baseMapper.selectById(noteId);
+        if (note == null || note.getIsDeleted() == 1) {
+            throw new BusinessException(404, "笔记不存在或已删除");
+        }
+        // 组装标签
+        List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
+        note.setTags(tags);
+        return note;
+    }
+
 }

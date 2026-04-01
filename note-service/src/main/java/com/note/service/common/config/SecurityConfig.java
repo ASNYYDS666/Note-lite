@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/share/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 添加 JWT 过滤器

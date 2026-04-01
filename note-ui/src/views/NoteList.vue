@@ -372,6 +372,13 @@
           >
             <el-icon><Delete /></el-icon>
           </button>
+          <button
+              class="share-btn"
+              @click.stop="generateShare(note.id)"
+              title="生成分享码"
+          >
+            <el-icon><Share /></el-icon>
+          </button>
         </div>
       </div>
     </div>
@@ -392,7 +399,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Plus, Delete, Search } from '@element-plus/icons-vue'
+import { Plus, Delete, Search, Share} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import TagFilter from '@/components/TagFilter.vue'
@@ -478,6 +485,18 @@ const softDelete = async (id) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
+  }
+}
+
+const generateShare = async (noteId) => {
+  try {
+    const res = await request.post('/share', { noteId, permission: 'READ' })
+    const shareCode = res.code
+    // 复制到剪贴板
+    await navigator.clipboard.writeText(shareCode)
+    ElMessage.success(`分享码已生成并复制：${shareCode}`)
+  } catch (error) {
+    ElMessage.error('生成分享码失败')
   }
 }
 

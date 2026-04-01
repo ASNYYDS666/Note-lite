@@ -41,6 +41,12 @@ const routes = [
                 component: () => import('@/views/NoteEdit.vue')
             }
         ]
+    },
+    {
+        path: '/share/:code',
+        name: 'ShareView',
+        component: () => import('@/views/ShareView.vue'),
+        meta: { public: true }
     }
 ]
 
@@ -55,7 +61,7 @@ router.beforeEach((to, from, next) => {
 
     if (to.meta.requiresAuth && !userStore.token) {
         next('/login')
-    } else if (to.meta.public && userStore.token) {
+    } else if (to.meta.public && userStore.token && (to.path === '/login' || to.path === '/register')) {
         // 已登录用户访问登录页，跳首页
         next('/')
     } else {

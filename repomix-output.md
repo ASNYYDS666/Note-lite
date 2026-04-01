@@ -96,352 +96,6 @@ README.md
 
 # Files
 
-## File: note-service/src/main/java/com/note/service/common/config/CorsConfig.java
-````java
-package com.note.service.common.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
-
-/**
- * 跨域配置
- * 允许前端 localhost:5173 / localhost:3000 访问后端 API
- *
- * 为什么需要这个配置？
- * 1. 浏览器同源策略禁止不同端口的请求
- * 2. 前后端分离项目必然跨域（前端5173，后端8080）
- * 3. 必须正确处理 OPTIONS 预检请求
- */
-@Configuration
-public class CorsConfig {
-
-    @Bean
-    public CorsFilter corsFilter() {
-        // 1. 创建 CORS 配置对象
-        CorsConfiguration config = new CorsConfiguration();
-
-        // ========== 允许的源 ==========
-        // 允许前端开发服务器地址（Vite 默认端口 5173）
-        config.addAllowedOrigin("http://localhost:5173");
-        // 允许 React 或其他前端常用端口（可选，不影响功能）
-        config.addAllowedOrigin("http://localhost:3000");
-        // 如果需要部署到线上，可以添加域名
-        // config.addAllowedOrigin("https://note.yourdomain.com");
-
-        // ========== 允许的请求头 ==========
-        // 允许所有请求头（包括 Authorization、Content-Type 等）
-        config.addAllowedHeader("*");
-
-        // ========== 允许的HTTP方法 ==========
-        // 允许所有方法（GET, POST, PUT, DELETE, OPTIONS 等）
-        config.addAllowedMethod("*");
-
-        // ========== 允许携带凭证 ==========
-        // 允许携带 Cookie 和 Authorization 头
-        config.setAllowCredentials(true);
-
-        // ========== 暴露响应头 ==========
-        // 让前端能读取 Authorization 头（如果 JWT Token 放在 header 里）
-        config.addExposedHeader("Authorization");
-
-        // ========== 预检请求缓存 ==========
-        // 预检请求结果缓存 1 小时（3600秒），减少 OPTIONS 请求次数
-        config.setMaxAge(3600L);
-
-        // 2. 为所有接口注册 CORS 配置
-        // 使用 "/**" 匹配所有路径，包括 Swagger 文档等非 /api 路径
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        // 3. 返回 CORS 过滤器
-        // 这个过滤器会自动注册到 Spring 过滤器链的最前面
-        // 确保 OPTIONS 预检请求在到达 Security 之前就被正确处理
-        return new CorsFilter(source);
-    }
-}
-````
-
-## File: note-ui/src/components/TagFilter.vue
-````vue
-//day05新建标签筛选组件
-<template>
-  <div class="tag-filter">
-    <el-select
-        v-model="selectedTags"
-        multiple
-        collapse-tags
-        collapse-tags-tooltip
-        placeholder="按标签筛选"
-        clearable
-        @change="handleChange"
-    >
-      <el-option
-          v-for="tag in allTags"
-          :key="tag"
-          :label="tag"
-          :value="tag"
-      />
-    </el-select>
-
-    <el-radio-group v-model="matchMode" size="small" @change="handleChange">
-      <el-radio-button label="ANY">任意标签</el-radio-button>
-      <el-radio-button label="ALL">全部标签</el-radio-button>
-    </el-radio-group>
-  </div>
-</template>
-
-<script setup>
-import { ref, watch } from 'vue'
-
-const props = defineProps({
-  modelValue: {
-    type: Array,
-    default: () => []
-  },
-  matchMode: {
-    type: String,
-    default: 'ANY'
-  },
-  allTags: {
-    type: Array,
-    default: () => []
-  }
-})
-
-const emit = defineEmits(['update:modelValue', 'update:matchMode', 'change'])
-
-const selectedTags = ref(props.modelValue)
-const matchMode = ref(props.matchMode)
-
-watch(() => props.modelValue, (val) => {
-  selectedTags.value = val
-})
-
-watch(() => props.matchMode, (val) => {
-  matchMode.value = val
-})
-
-const handleChange = () => {
-  emit('update:modelValue', selectedTags.value)
-  emit('update:matchMode', matchMode.value)
-  emit('change', {
-    tags: selectedTags.value,
-    matchMode: matchMode.value
-  })
-}
-</script>
-
-<style scoped>
-.tag-filter {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.tag-filter .el-select {
-  width: 200px;
-}
-</style>
-````
-
-## File: note-ui/src/views/RecycleBin.vue
-````vue
-<template>
-  <div class="recycle-bin">
-    <div class="header">
-      <h3>回收站</h3>
-      <el-button type="danger" :loading="clearing" @click="handleClearAll">
-        清空回收站
-      </el-button>
-    </div>
-
-    <el-empty v-if="!loading && notes.length === 0" description="回收站是空的" />
-
-    <div v-else class="list">
-      <el-card v-for="note in notes" :key="note.id" class="note-card">
-        <h4 class="title">{{ note.title }}</h4>
-        <p class="summary">{{ note.summary || '暂无摘要' }}</p>
-        <div class="meta">
-          <el-tag v-for="tag in note.tags" :key="tag" size="small" class="tag">
-            {{ tag }}
-          </el-tag>
-          <span class="time">删除于 {{ formatTime(note.deletedAt) }}</span>
-        </div>
-        <div class="actions">
-          <el-button size="small" type="primary" @click="restoreNote(note.id)">
-            恢复
-          </el-button>
-          <el-button size="small" type="danger" @click="permanentDelete(note.id)">
-            永久删除
-          </el-button>
-        </div>
-      </el-card>
-    </div>
-
-    <el-pagination
-        v-if="total > 0"
-        v-model:current-page="pageNum"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next"
-        @current-change="loadRecycle"
-    />
-  </div>
-</template>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import request from '@/utils/request'
-
-const notes = ref([])
-const loading = ref(false)
-const clearing = ref(false)
-const pageNum = ref(1)
-const pageSize = ref(20)
-const total = ref(0)
-
-const loadRecycle = async () => {
-  loading.value = true
-  try {
-    const res = await request.get('/note/recycle/page', {
-      params: {
-        pageNum: pageNum.value,
-        pageSize: pageSize.value
-      }
-    })
-    notes.value = res.data.records
-    total.value = res.data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-const restoreNote = async (id) => {
-  try {
-    await request.put(`/note/${id}/restore`)
-    ElMessage.success('已恢复')
-    loadRecycle()
-  } catch (error) {
-    console.error('恢复失败:', error)
-  }
-}
-
-const permanentDelete = async (id) => {
-  try {
-    await ElMessageBox.confirm('确定永久删除该笔记吗？此操作不可恢复', '警告', {
-      type: 'warning'
-    })
-    await request.delete(`/note/${id}?permanent=true`)
-    ElMessage.success('已永久删除')
-    loadRecycle()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-    }
-  }
-}
-
-const handleClearAll = async () => {
-  try {
-    await ElMessageBox.confirm('确定清空回收站吗？所有笔记将永久删除', '警告', {
-      type: 'warning'
-    })
-    clearing.value = true
-    await request.delete('/note/recycle/clear')
-    ElMessage.success('回收站已清空')
-    loadRecycle()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('清空失败:', error)
-    }
-  } finally {
-    clearing.value = false
-  }
-}
-
-const formatTime = (time) => {
-  if (!time) return ''
-  return new Date(time).toLocaleString('zh-CN')
-}
-
-onMounted(loadRecycle)
-</script>
-
-<style scoped>
-.recycle-bin {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.note-card {
-  margin-bottom: 15px;
-  position: relative;
-}
-
-.title {
-  margin: 0 0 10px 0;
-  color: #303133;
-}
-
-.summary {
-  color: #606266;
-  font-size: 14px;
-  margin-bottom: 10px;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.tag {
-  margin-right: 5px;
-}
-
-.time {
-  color: #909399;
-  font-size: 12px;
-  margin-left: auto;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  border-top: 1px solid #ebeef5;
-  padding-top: 15px;
-}
-</style>
-````
-
-## File: package.json
-````json
-{
-  "dependencies": {
-    "lodash-es": "^4.17.23"
-  }
-}
-````
-
 ## File: note-service/.gitattributes
 ````
 /mvnw text eol=lf
@@ -984,6 +638,74 @@ try {
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
 ````
 
+## File: note-service/src/main/java/com/note/service/common/config/CorsConfig.java
+````java
+package com.note.service.common.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+/**
+ * 跨域配置
+ * 允许前端 localhost:5173 / localhost:3000 访问后端 API
+ *
+ * 为什么需要这个配置？
+ * 1. 浏览器同源策略禁止不同端口的请求
+ * 2. 前后端分离项目必然跨域（前端5173，后端8080）
+ * 3. 必须正确处理 OPTIONS 预检请求
+ */
+@Configuration
+public class CorsConfig {
+
+    @Bean
+    public CorsFilter corsFilter() {
+        // 1. 创建 CORS 配置对象
+        CorsConfiguration config = new CorsConfiguration();
+
+        // ========== 允许的源 ==========
+        // 允许前端开发服务器地址（Vite 默认端口 5173）
+        config.addAllowedOrigin("http://localhost:5173");
+        // 允许 React 或其他前端常用端口（可选，不影响功能）
+        config.addAllowedOrigin("http://localhost:3000");
+        // 如果需要部署到线上，可以添加域名
+        // config.addAllowedOrigin("https://note.yourdomain.com");
+
+        // ========== 允许的请求头 ==========
+        // 允许所有请求头（包括 Authorization、Content-Type 等）
+        config.addAllowedHeader("*");
+
+        // ========== 允许的HTTP方法 ==========
+        // 允许所有方法（GET, POST, PUT, DELETE, OPTIONS 等）
+        config.addAllowedMethod("*");
+
+        // ========== 允许携带凭证 ==========
+        // 允许携带 Cookie 和 Authorization 头
+        config.setAllowCredentials(true);
+
+        // ========== 暴露响应头 ==========
+        // 让前端能读取 Authorization 头（如果 JWT Token 放在 header 里）
+        config.addExposedHeader("Authorization");
+
+        // ========== 预检请求缓存 ==========
+        // 预检请求结果缓存 1 小时（3600秒），减少 OPTIONS 请求次数
+        config.setMaxAge(3600L);
+
+        // 2. 为所有接口注册 CORS 配置
+        // 使用 "/**" 匹配所有路径，包括 Swagger 文档等非 /api 路径
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        // 3. 返回 CORS 过滤器
+        // 这个过滤器会自动注册到 Spring 过滤器链的最前面
+        // 确保 OPTIONS 预检请求在到达 Security 之前就被正确处理
+        return new CorsFilter(source);
+    }
+}
+````
+
 ## File: note-service/src/main/java/com/note/service/common/config/JwtAuthenticationFilter.java
 ````java
 //day03
@@ -1073,131 +795,6 @@ public class MybatisPlusConfig {
         // 添加分页插件（指定数据库类型为 MySQL）
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;
-    }
-}
-````
-
-## File: note-service/src/main/java/com/note/service/common/config/RedisConfig.java
-````java
-package com.note.service.common.config;
-
-//import com.fasterxml.jackson.databind.ObjectMapper;
-//import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-//import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
-
-//@Configuration
-//public class RedisConfig {
-//
-//    @Bean
-//    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-//        RedisTemplate<String, Object> template = new RedisTemplate<>();
-//        template.setConnectionFactory(factory);
-//
-//        // Key 用 String 序列化
-//        template.setKeySerializer(new StringRedisSerializer());
-//        template.setHashKeySerializer(new StringRedisSerializer());
-//
-//        // Value 用 JSON 序列化（带类型信息，便于反序列化）
-//        ObjectMapper mapper = new ObjectMapper();
-//        mapper.activateDefaultTyping(
-//                LaissezFaireSubTypeValidator.instance,
-//                ObjectMapper.DefaultTyping.NON_FINAL
-//        );
-//        GenericJackson2JsonRedisSerializer serializer =
-//                new GenericJackson2JsonRedisSerializer(mapper);
-//
-//        template.setValueSerializer(serializer);
-//        template.setHashValueSerializer(serializer);
-//        template.afterPropertiesSet();
-//
-//        return template;
-//    }
-//}
-@Configuration
-public class RedisConfig {
-
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(factory);
-
-        // Key 用 String 序列化
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setHashKeySerializer(new StringRedisSerializer());
-
-        // Value 只序列化字符串，避免反序列化漏洞
-        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
-        template.setValueSerializer(stringRedisSerializer);
-        template.setHashValueSerializer(stringRedisSerializer);
-
-        template.afterPropertiesSet();
-        return template;
-    }
-}
-````
-
-## File: note-service/src/main/java/com/note/service/common/config/SecurityConfig.java
-````java
-//day03
-package com.note.service.common.config;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;  // 添加这行！
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
-@RequiredArgsConstructor
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                // ========== 1. 启用 CORS ==========
-                // 这一行告诉 Spring Security："跨域配置交给 CorsFilter 处理，你不要插手"
-                // 必须加，否则 Security 会拦截 OPTIONS 请求
-                .cors(Customizer.withDefaults())
-
-                // 禁用 CSRF（前后端分离不需要）
-                .csrf(AbstractHttpConfigurer::disable)
-
-                // 无状态会话（不用 Session）
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 配置授权规则
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
-                        .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
-                )
-                // 添加 JWT 过滤器
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }
 ````
@@ -1377,6 +974,1444 @@ public class Result<T> {
         result.setCode(code);
         result.setMessage(message);
         return result;
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/dto/LoginDTO.java
+````java
+//day03
+package com.note.service.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class LoginDTO {
+    @NotBlank(message = "用户名不能为空")
+    private String username;
+
+    @NotBlank(message = "密码不能为空")
+    private String password;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/dto/NoteDTO.java
+````java
+package com.note.service.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+import java.util.List;
+
+@Data
+public class NoteDTO {
+
+    private Long id;  // 更新时用
+
+    @NotBlank(message = "标题不能为空")
+    @Size(max = 200, message = "标题最长200字符")
+    private String title;
+
+    private String content;  // Markdown原文
+
+    @Size(max = 10, message = "最多10个标签")
+    private List<String> tags;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/entity/NoteTagEntity.java
+````java
+package com.note.service.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("note_tag")
+public class NoteTagEntity {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private Long noteId;
+    private String tagName;
+    private LocalDateTime createdAt;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/NoteServiceApplication.java
+````java
+package com.note.service;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class NoteServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(NoteServiceApplication.class, args);
+	}
+
+}
+````
+
+## File: note-service/src/main/resources/db/migration/V2__create_note_and_tag.sql
+````sql
+CREATE TABLE IF NOT EXISTS `note` (
+                                      `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                      `user_id`       BIGINT       NOT NULL COMMENT '作者ID',
+                                      `title`         VARCHAR(200) NOT NULL DEFAULT '未命名笔记',
+    `content`       LONGTEXT     COMMENT 'Markdown内容',
+    `summary`       VARCHAR(500) COMMENT '纯文本摘要',
+    `is_deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '0-正常 1-回收站',
+    `deleted_at`    DATETIME     COMMENT '删除时间',
+    `created_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_is_deleted` (`is_deleted`),
+    INDEX `idx_updated_at` (`updated_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记表';
+
+-- 标签关联表（简化版，不单独建标签字典表）
+
+CREATE TABLE IF NOT EXISTS `note_tag` (
+                                          `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                          `note_id`       BIGINT       NOT NULL,
+                                          `tag_name`      VARCHAR(50)  NOT NULL COMMENT '标签名',
+    `created_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_note_tag` (`note_id`, `tag_name`),
+    INDEX `idx_tag_name` (`tag_name`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记标签关联表';
+````
+
+## File: note-service/src/test/java/com/note/service/NoteServiceApplicationTests.java
+````java
+package com.note.service;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class NoteServiceApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+````
+
+## File: note-ui/.gitignore
+````
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+````
+
+## File: note-ui/public/vite.svg
+````xml
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
+````
+
+## File: note-ui/src/App.vue
+````vue
+<template>
+  <router-view />
+</template>
+````
+
+## File: note-ui/src/components/MarkdownEditor.vue
+````vue
+<template>
+  <div class="md-editor">
+    <div class="toolbar">
+      <el-button-group>
+        <el-button size="small" @click="insert('**', '**')">B</el-button>
+        <el-button size="small" @click="insert('*', '*')">I</el-button>
+        <el-button size="small" @click="insert('## ', '')">H</el-button>
+        <el-button size="small" @click="insert('- ', '')">List</el-button>
+        <el-button size="small" @click="insert('```\n', '\n```')">Code</el-button>
+      </el-button-group>
+
+      <el-button type="primary" size="small" :loading="saving" @click="save">
+        保存
+      </el-button>
+    </div>
+
+    <div class="editor-container">
+      <textarea
+          ref="textarea"
+          v-model="content"
+          class="edit-area"
+          placeholder="输入 Markdown..."
+          @input="onInput"
+      />
+      <div class="preview-area" v-html="renderedHtml" />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
+
+const props = defineProps({
+  modelValue: { type: String, default: '' },
+  saving: { type: Boolean, default: false }
+})
+
+const emit = defineEmits(['update:modelValue', 'save'])
+
+const content = ref(props.modelValue)
+const textarea = ref(null)
+
+// 配置 marked
+marked.setOptions({
+  highlight: (code, lang) => {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value
+    }
+    return hljs.highlightAuto(code).value
+  },
+  breaks: true,
+  gfm: true
+})
+
+const renderedHtml = computed(() => marked.parse(content.value))
+
+watch(() => props.modelValue, (val) => {
+  if (val !== content.value) content.value = val
+})
+
+const onInput = () => {
+  emit('update:modelValue', content.value)
+}
+
+const insert = (before, after) => {
+  const el = textarea.value
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const selected = content.value.substring(start, end)
+
+  content.value = (
+      content.value.substring(0, start) +
+      before + selected + after +
+      content.value.substring(end)
+  )
+
+  emit('update:modelValue', content.value)
+
+  // 恢复光标
+  setTimeout(() => {
+    el.focus()
+    const newPos = start + before.length + selected.length
+    el.setSelectionRange(newPos, newPos)
+  }, 0)
+}
+
+const save = () => {
+  emit('save')
+}
+</script>
+
+<style scoped>
+.md-editor {
+  height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.toolbar {
+  padding: 10px;
+  border-bottom: 1px solid #dcdfe6;
+  display: flex;
+  justify-content: space-between;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.edit-area, .preview-area {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.edit-area {
+  border: none;
+  border-right: 1px solid #dcdfe6;
+  resize: none;
+  outline: none;
+  background: #fafafa;
+}
+
+.preview-area :deep(h1) { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+.preview-area :deep(h2) { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+.preview-area :deep(pre) { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
+.preview-area :deep(code) { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 85%; }
+.preview-area :deep(blockquote) { border-left: 4px solid #dfe2e5; padding-left: 16px; color: #6a737d; margin: 0; }
+</style>
+````
+
+## File: note-ui/src/components/TagFilter.vue
+````vue
+//day05新建标签筛选组件
+<template>
+  <div class="tag-filter">
+    <el-select
+        v-model="selectedTags"
+        multiple
+        collapse-tags
+        collapse-tags-tooltip
+        placeholder="按标签筛选"
+        clearable
+        @change="handleChange"
+    >
+      <el-option
+          v-for="tag in allTags"
+          :key="tag"
+          :label="tag"
+          :value="tag"
+      />
+    </el-select>
+
+    <el-radio-group v-model="matchMode" size="small" @change="handleChange">
+      <el-radio-button label="ANY">任意标签</el-radio-button>
+      <el-radio-button label="ALL">全部标签</el-radio-button>
+    </el-radio-group>
+  </div>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  },
+  matchMode: {
+    type: String,
+    default: 'ANY'
+  },
+  allTags: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const emit = defineEmits(['update:modelValue', 'update:matchMode', 'change'])
+
+const selectedTags = ref(props.modelValue)
+const matchMode = ref(props.matchMode)
+
+watch(() => props.modelValue, (val) => {
+  selectedTags.value = val
+})
+
+watch(() => props.matchMode, (val) => {
+  matchMode.value = val
+})
+
+const handleChange = () => {
+  emit('update:modelValue', selectedTags.value)
+  emit('update:matchMode', matchMode.value)
+  emit('change', {
+    tags: selectedTags.value,
+    matchMode: matchMode.value
+  })
+}
+</script>
+
+<style scoped>
+.tag-filter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tag-filter .el-select {
+  width: 200px;
+}
+</style>
+````
+
+## File: note-ui/src/counter.ts
+````typescript
+export function setupCounter(element: HTMLButtonElement) {
+  let counter = 0
+  const setCounter = (count: number) => {
+    counter = count
+    element.innerHTML = `count is ${counter}`
+  }
+  element.addEventListener('click', () => setCounter(counter + 1))
+  setCounter(0)
+}
+````
+
+## File: note-ui/src/main.js
+````javascript
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+
+import App from './App.vue'
+import router from './router'
+
+const app = createApp(App)
+
+// 注册所有图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    app.component(key, component)
+}
+
+app.use(createPinia())
+app.use(router)
+app.use(ElementPlus)
+
+app.mount('#app')
+````
+
+## File: note-ui/src/style.css
+````css
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.vanilla:hover {
+  filter: drop-shadow(0 0 2em #3178c6aa);
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+````
+
+## File: note-ui/src/typescript.svg
+````xml
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="32" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="#007ACC" d="M0 128v128h256V0H0z"></path><path fill="#FFF" d="m56.612 128.85l-.081 10.483h33.32v94.68h23.568v-94.68h33.321v-10.28c0-5.69-.122-10.444-.284-10.566c-.122-.162-20.4-.244-44.983-.203l-44.74.122l-.121 10.443Zm149.955-10.742c6.501 1.625 11.459 4.51 16.01 9.224c2.357 2.52 5.851 7.111 6.136 8.208c.08.325-11.053 7.802-17.798 11.988c-.244.162-1.22-.894-2.317-2.52c-3.291-4.795-6.745-6.867-12.028-7.233c-7.76-.528-12.759 3.535-12.718 10.321c0 1.992.284 3.17 1.097 4.795c1.707 3.536 4.876 5.649 14.832 9.956c18.326 7.883 26.168 13.084 31.045 20.48c5.445 8.249 6.664 21.415 2.966 31.208c-4.063 10.646-14.14 17.879-28.323 20.276c-4.388.772-14.79.65-19.504-.203c-10.28-1.828-20.033-6.908-26.047-13.572c-2.357-2.6-6.949-9.387-6.664-9.874c.122-.163 1.178-.813 2.356-1.504c1.138-.65 5.446-3.129 9.509-5.485l7.355-4.267l1.544 2.276c2.154 3.29 6.867 7.801 9.712 9.305c8.167 4.307 19.383 3.698 24.909-1.26c2.357-2.153 3.332-4.388 3.332-7.68c0-2.966-.366-4.266-1.91-6.501c-1.99-2.845-6.054-5.242-17.595-10.24c-13.206-5.69-18.895-9.224-24.096-14.832c-3.007-3.25-5.852-8.452-7.03-12.8c-.975-3.617-1.22-12.678-.447-16.335c2.723-12.76 12.353-21.659 26.25-24.3c4.51-.853 14.994-.528 19.424.569Z"></path></svg>
+````
+
+## File: note-ui/src/views/RecycleBin.vue
+````vue
+<!--修改前代码-->
+<!--<template>-->
+<!--  <div class="recycle-bin">-->
+<!--    <div class="header">-->
+<!--      <h3>回收站</h3>-->
+<!--      <el-button type="danger" :loading="clearing" @click="handleClearAll">-->
+<!--        清空回收站-->
+<!--      </el-button>-->
+<!--    </div>-->
+
+<!--    <el-empty v-if="!loading && notes.length === 0" description="回收站是空的" />-->
+
+<!--    <div v-else class="list">-->
+<!--      <el-card v-for="note in notes" :key="note.id" class="note-card">-->
+<!--        <h4 class="title">{{ note.title }}</h4>-->
+<!--        <p class="summary">{{ note.summary || '暂无摘要' }}</p>-->
+<!--        <div class="meta">-->
+<!--          <el-tag v-for="tag in note.tags" :key="tag" size="small" class="tag">-->
+<!--            {{ tag }}-->
+<!--          </el-tag>-->
+<!--          <span class="time">删除于 {{ formatTime(note.deletedAt) }}</span>-->
+<!--        </div>-->
+<!--        <div class="actions">-->
+<!--          <el-button size="small" type="primary" @click="restoreNote(note.id)">-->
+<!--            恢复-->
+<!--          </el-button>-->
+<!--          <el-button size="small" type="danger" @click="permanentDelete(note.id)">-->
+<!--            永久删除-->
+<!--          </el-button>-->
+<!--        </div>-->
+<!--      </el-card>-->
+<!--    </div>-->
+
+<!--    <el-pagination-->
+<!--        v-if="total > 0"-->
+<!--        v-model:current-page="pageNum"-->
+<!--        :page-size="pageSize"-->
+<!--        :total="total"-->
+<!--        layout="prev, pager, next"-->
+<!--        @current-change="loadRecycle"-->
+<!--    />-->
+<!--  </div>-->
+<!--</template>-->
+
+<!--<script setup>-->
+<!--import { ref, onMounted } from 'vue'-->
+<!--import { ElMessage, ElMessageBox } from 'element-plus'-->
+<!--import request from '@/utils/request'-->
+
+<!--const notes = ref([])-->
+<!--const loading = ref(false)-->
+<!--const clearing = ref(false)-->
+<!--const pageNum = ref(1)-->
+<!--const pageSize = ref(20)-->
+<!--const total = ref(0)-->
+
+<!--const loadRecycle = async () => {-->
+<!--  loading.value = true-->
+<!--  try {-->
+<!--    const res = await request.get('/note/recycle/page', {-->
+<!--      params: {-->
+<!--        pageNum: pageNum.value,-->
+<!--        pageSize: pageSize.value-->
+<!--      }-->
+<!--    })-->
+<!--    notes.value = res.records-->
+<!--    total.value = res.total-->
+<!--  } finally {-->
+<!--    loading.value = false-->
+<!--  }-->
+<!--}-->
+
+<!--const restoreNote = async (id) => {-->
+<!--  try {-->
+<!--    await request.put(`/note/${id}/restore`)-->
+<!--    ElMessage.success('已恢复')-->
+<!--    loadRecycle()-->
+<!--  } catch (error) {-->
+<!--    console.error('恢复失败:', error)-->
+<!--  }-->
+<!--}-->
+
+<!--const permanentDelete = async (id) => {-->
+<!--  try {-->
+<!--    await ElMessageBox.confirm('确定永久删除该笔记吗？此操作不可恢复', '警告', {-->
+<!--      type: 'warning'-->
+<!--    })-->
+<!--    await request.delete(`/note/${id}?permanent=true`)-->
+<!--    ElMessage.success('已永久删除')-->
+<!--    loadRecycle()-->
+<!--  } catch (error) {-->
+<!--    if (error !== 'cancel') {-->
+<!--      console.error('删除失败:', error)-->
+<!--    }-->
+<!--  }-->
+<!--}-->
+
+<!--const handleClearAll = async () => {-->
+<!--  try {-->
+<!--    await ElMessageBox.confirm('确定清空回收站吗？所有笔记将永久删除', '警告', {-->
+<!--      type: 'warning'-->
+<!--    })-->
+<!--    clearing.value = true-->
+<!--    await request.delete('/note/recycle/clear')-->
+<!--    ElMessage.success('回收站已清空')-->
+<!--    loadRecycle()-->
+<!--  } catch (error) {-->
+<!--    if (error !== 'cancel') {-->
+<!--      console.error('清空失败:', error)-->
+<!--    }-->
+<!--  } finally {-->
+<!--    clearing.value = false-->
+<!--  }-->
+<!--}-->
+
+<!--const formatTime = (time) => {-->
+<!--  if (!time) return ''-->
+<!--  return new Date(time).toLocaleString('zh-CN')-->
+<!--}-->
+
+<!--onMounted(loadRecycle)-->
+<!--</script>-->
+
+<!--<style scoped>-->
+<!--.recycle-bin {-->
+<!--  max-width: 1200px;-->
+<!--  margin: 0 auto;-->
+<!--}-->
+
+<!--.header {-->
+<!--  display: flex;-->
+<!--  justify-content: space-between;-->
+<!--  align-items: center;-->
+<!--  margin-bottom: 20px;-->
+<!--}-->
+
+<!--.note-card {-->
+<!--  margin-bottom: 15px;-->
+<!--  position: relative;-->
+<!--}-->
+
+<!--.title {-->
+<!--  margin: 0 0 10px 0;-->
+<!--  color: #303133;-->
+<!--}-->
+
+<!--.summary {-->
+<!--  color: #606266;-->
+<!--  font-size: 14px;-->
+<!--  margin-bottom: 10px;-->
+<!--  line-height: 1.5;-->
+<!--  display: -webkit-box;-->
+<!--  -webkit-line-clamp: 2;-->
+<!--  -webkit-box-orient: vertical;-->
+<!--  overflow: hidden;-->
+<!--}-->
+
+<!--.meta {-->
+<!--  display: flex;-->
+<!--  align-items: center;-->
+<!--  gap: 10px;-->
+<!--  flex-wrap: wrap;-->
+<!--  margin-bottom: 15px;-->
+<!--}-->
+
+<!--.tag {-->
+<!--  margin-right: 5px;-->
+<!--}-->
+
+<!--.time {-->
+<!--  color: #909399;-->
+<!--  font-size: 12px;-->
+<!--  margin-left: auto;-->
+<!--}-->
+
+<!--.actions {-->
+<!--  display: flex;-->
+<!--  gap: 10px;-->
+<!--  justify-content: flex-end;-->
+<!--  border-top: 1px solid #ebeef5;-->
+<!--  padding-top: 15px;-->
+<!--}-->
+<!--</style>-->
+
+
+<!--修改后代码-->
+<template>
+  <div class="recycle-bin">
+
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <h2 class="page-title">回收站</h2>
+        <span class="note-count" v-if="total > 0">{{ total }} 篇待清理</span>
+      </div>
+      <button
+          v-if="notes.length > 0"
+          class="clear-btn"
+          :class="{ loading: clearing }"
+          :disabled="clearing"
+          @click="handleClearAll"
+      >
+        <svg v-if="!clearing" class="btn-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg v-else class="btn-icon spin" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="2.5"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        {{ clearing ? '清空中...' : '清空回收站' }}
+      </button>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-if="!loading && notes.length === 0" class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 80 80" fill="none">
+          <circle cx="40" cy="40" r="36" fill="#f5f3ff"/>
+          <path d="M25 32h30M30 32V28a2 2 0 012-2h16a2 2 0 012 2v4M35 38v16M45 38v16" stroke="#c8c5e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="26" y="32" width="28" height="22" rx="2" stroke="#c8c5e8" stroke-width="2"/>
+        </svg>
+      </div>
+      <p class="empty-title">回收站是空的</p>
+      <p class="empty-sub">移入回收站的笔记会在这里等待</p>
+    </div>
+
+    <!-- 骨架屏 -->
+    <div v-if="loading" class="note-list">
+      <div v-for="i in 3" :key="i" class="skeleton-card">
+        <div class="skeleton-left">
+          <div class="skeleton-title"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-meta"></div>
+        </div>
+        <div class="skeleton-actions"></div>
+      </div>
+    </div>
+
+    <!-- 笔记列表 -->
+    <div v-if="!loading && notes.length > 0" class="note-list">
+      <div
+          v-for="note in notes"
+          :key="note.id"
+          class="note-card"
+      >
+        <div class="card-main">
+          <!-- 删除时间标记 -->
+          <div class="delete-badge">
+            <svg viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M6 3.5V6l1.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            {{ formatTime(note.deletedAt) }} 删除
+          </div>
+
+          <h3 class="card-title">{{ note.title }}</h3>
+          <p class="card-summary">{{ note.summary || '暂无摘要' }}</p>
+
+          <div class="card-tags" v-if="note.tags && note.tags.length > 0">
+            <span v-for="tag in note.tags.slice(0, 4)" :key="tag" class="tag-pill">{{ tag }}</span>
+            <span v-if="note.tags.length > 4" class="tag-more">+{{ note.tags.length - 4 }}</span>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="action-btn restore-btn" @click="restoreNote(note.id)">
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M3 8a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M3 4.5V8h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            恢复
+          </button>
+          <button class="action-btn delete-btn" @click="permanentDelete(note.id)">
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            永久删除
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination-wrap" v-if="total > pageSize">
+      <el-pagination
+          v-model:current-page="pageNum"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="loadRecycle"
+      />
+    </div>
+
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import request from '@/utils/request'
+
+const notes = ref([])
+const loading = ref(false)
+const clearing = ref(false)
+const pageNum = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+
+const loadRecycle = async () => {
+  loading.value = true
+  try {
+    const res = await request.get('/note/recycle/page', {
+      params: { pageNum: pageNum.value, pageSize: pageSize.value }
+    })
+    notes.value = res.records
+    total.value = res.total
+  } finally {
+    loading.value = false
+  }
+}
+
+const restoreNote = async (id) => {
+  try {
+    await request.put(`/note/${id}/restore`)
+    ElMessage.success('已恢复到笔记列表')
+    loadRecycle()
+  } catch (error) {
+    console.error('恢复失败:', error)
+  }
+}
+
+const permanentDelete = async (id) => {
+  try {
+    await ElMessageBox.confirm('永久删除后无法恢复，确定继续吗？', '永久删除', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger'
+    })
+    await request.delete(`/note/${id}?permanent=true`)
+    ElMessage.success('已永久删除')
+    loadRecycle()
+  } catch (error) {
+    if (error !== 'cancel') console.error('删除失败:', error)
+  }
+}
+
+const handleClearAll = async () => {
+  try {
+    await ElMessageBox.confirm(
+        `将永久删除回收站中全部 ${total.value} 篇笔记，此操作不可撤销。`,
+        '清空回收站',
+        {
+          type: 'warning',
+          confirmButtonText: '全部删除',
+          cancelButtonText: '取消',
+          confirmButtonClass: 'el-button--danger'
+        }
+    )
+    clearing.value = true
+    await request.delete('/note/recycle/clear')
+    ElMessage.success('回收站已清空')
+    loadRecycle()
+  } catch (error) {
+    if (error !== 'cancel') console.error('清空失败:', error)
+  } finally {
+    clearing.value = false
+  }
+}
+
+const formatTime = (time) => {
+  if (!time) return ''
+  const d = new Date(time)
+  const now = new Date()
+  const diff = now - d
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
+  if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / 86400000)} 天前`
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+onMounted(loadRecycle)
+</script>
+
+<style scoped>
+.recycle-bin {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 4px 0;
+}
+
+/* ===== 顶部工具栏 ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.note-count {
+  font-size: 13px;
+  color: #d47a5a;
+  font-weight: 400;
+}
+
+.clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff5f3;
+  color: #c0522e;
+  border: 1px solid #f5cfc4;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.clear-btn:hover:not(:disabled) {
+  background: #fee5de;
+  border-color: #f0b8a8;
+}
+
+.clear-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+}
+
+.empty-icon svg { width: 100%; height: 100%; }
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #4a4a6a;
+  margin: 0 0 8px 0;
+}
+
+.empty-sub {
+  font-size: 14px;
+  color: #9896b0;
+  margin: 0;
+}
+
+/* ===== 骨架屏 ===== */
+.skeleton-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  border: 1px solid #f0eef8;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 10px;
+}
+
+.skeleton-left { flex: 1; }
+
+.skeleton-title,
+.skeleton-line,
+.skeleton-meta,
+.skeleton-actions {
+  background: #f0eef8;
+  border-radius: 4px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title { width: 55%; height: 18px; margin-bottom: 10px; }
+.skeleton-line  { width: 85%; height: 13px; margin-bottom: 7px; }
+.skeleton-meta  { width: 30%; height: 13px; }
+.skeleton-actions { width: 140px; height: 32px; border-radius: 8px; flex-shrink: 0; margin-left: 20px; }
+
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== 笔记列表 ===== */
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+/* ===== 笔记卡片 ===== */
+.note-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: white;
+  border: 1px solid #f0eef8;
+  border-radius: 14px;
+  padding: 20px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.note-card:hover {
+  border-color: #e8e4f8;
+  box-shadow: 0 4px 16px rgba(107, 92, 231, 0.06);
+}
+
+.card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #c09080;
+  background: #fff5f0;
+  border-radius: 20px;
+  padding: 3px 9px;
+  margin-bottom: 10px;
+}
+
+.delete-badge svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2a2a3e;
+  margin: 0 0 6px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+}
+
+.card-summary {
+  font-size: 13px;
+  color: #7c7a96;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tag-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #f0eef8;
+  color: #6b5ce7;
+  font-weight: 500;
+}
+
+.tag-more {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #f5f5f5;
+  color: #9896b0;
+}
+
+/* ===== 操作按钮组 ===== */
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100px;
+  padding: 7px 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  border: 1px solid transparent;
+}
+
+.action-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.restore-btn {
+  background: #f0eeff;
+  color: #5a50d8;
+  border-color: #dddaf8;
+}
+
+.restore-btn:hover {
+  background: #e6e2ff;
+  border-color: #c8c2f4;
+}
+
+.delete-btn {
+  background: #fff5f3;
+  color: #c0522e;
+  border-color: #f5cfc4;
+}
+
+.delete-btn:hover {
+  background: #fee5de;
+  border-color: #f0b8a8;
+}
+
+/* ===== 分页 ===== */
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+}
+
+.pagination-wrap :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: #6b5ce7;
+}
+
+.pagination-wrap :deep(.el-pagination.is-background .el-pager li:hover) {
+  color: #6b5ce7;
+}
+</style>
+````
+
+## File: note-ui/tsconfig.json
+````json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+````
+
+## File: note-ui/vite.config.js
+````javascript
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import path from 'path'
+
+export default defineConfig({
+    plugins: [vue()],
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, './src')
+        }
+    },
+    server: {
+        port: 5173,
+        open: true
+    }
+})
+````
+
+## File: package.json
+````json
+{
+  "dependencies": {
+    "lodash-es": "^4.17.23"
+  }
+}
+````
+
+## File: README.md
+````markdown
+# Note-lite
+````
+
+## File: note-service/src/main/java/com/note/service/common/config/RedisConfig.java
+````java
+package com.note.service.common.config;
+
+//import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+//import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+//@Configuration
+//public class RedisConfig {
+//
+//    @Bean
+//    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+//        RedisTemplate<String, Object> template = new RedisTemplate<>();
+//        template.setConnectionFactory(factory);
+//
+//        // Key 用 String 序列化
+//        template.setKeySerializer(new StringRedisSerializer());
+//        template.setHashKeySerializer(new StringRedisSerializer());
+//
+//        // Value 用 JSON 序列化（带类型信息，便于反序列化）
+//        ObjectMapper mapper = new ObjectMapper();
+//        mapper.activateDefaultTyping(
+//                LaissezFaireSubTypeValidator.instance,
+//                ObjectMapper.DefaultTyping.NON_FINAL
+//        );
+//        GenericJackson2JsonRedisSerializer serializer =
+//                new GenericJackson2JsonRedisSerializer(mapper);
+//
+//        template.setValueSerializer(serializer);
+//        template.setHashValueSerializer(serializer);
+//        template.afterPropertiesSet();
+//
+//        return template;
+//    }
+//}
+@Configuration
+public class RedisConfig {
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(factory);
+
+        // Key 用 String 序列化
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+
+        // Value 只序列化字符串，避免反序列化漏洞
+        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+        template.setValueSerializer(stringRedisSerializer);
+        template.setHashValueSerializer(stringRedisSerializer);
+
+        template.afterPropertiesSet();
+        return template;
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/common/config/SecurityConfig.java
+````java
+//day03
+package com.note.service.common.config;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;  // 添加这行！
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@RequiredArgsConstructor
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                // ========== 1. 启用 CORS ==========
+                // 这一行告诉 Spring Security："跨域配置交给 CorsFilter 处理，你不要插手"
+                // 必须加，否则 Security 会拦截 OPTIONS 请求
+                .cors(Customizer.withDefaults())
+
+                // 禁用 CSRF（前后端分离不需要）
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // 无状态会话（不用 Session）
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // 配置授权规则
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
+                        .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                // 添加 JWT 过滤器
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/config/SwaggerConfig.java
+````java
+package com.note.service.config;
+
+//day02
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.Contact;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SwaggerConfig {  // 类名可以不改，或改为 Knife4jConfig
+
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Note Service API")
+                        .version("1.0")
+                        .description("笔记服务接口文档")
+                        .contact(new Contact()
+                                .name("作者")
+                                .email("your.email@example.com")));
     }
 }
 ````
@@ -1565,49 +2600,6 @@ public class NoteController {
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/dto/LoginDTO.java
-````java
-//day03
-package com.note.service.dto;
-
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
-
-@Data
-public class LoginDTO {
-    @NotBlank(message = "用户名不能为空")
-    private String username;
-
-    @NotBlank(message = "密码不能为空")
-    private String password;
-}
-````
-
-## File: note-service/src/main/java/com/note/service/dto/NoteDTO.java
-````java
-package com.note.service.dto;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.Data;
-import java.util.List;
-
-@Data
-public class NoteDTO {
-
-    private Long id;  // 更新时用
-
-    @NotBlank(message = "标题不能为空")
-    @Size(max = 200, message = "标题最长200字符")
-    private String title;
-
-    private String content;  // Markdown原文
-
-    @Size(max = 10, message = "最多10个标签")
-    private List<String> tags;
-}
-````
-
 ## File: note-service/src/main/java/com/note/service/dto/NoteQueryDTO.java
 ````java
 package com.note.service.dto;
@@ -1676,24 +2668,25 @@ public class NoteEntity {
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/entity/NoteTagEntity.java
+## File: note-service/src/main/java/com/note/service/entity/UserEntity.java
 ````java
+//day02
 package com.note.service.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("note_tag")
-public class NoteTagEntity {
-
-    @TableId(type = IdType.AUTO)
+@TableName("user")
+public class UserEntity {
     private Long id;
-
-    private Long noteId;
-    private String tagName;
+    private String username;
+    private String password;
+    private String email;
+    private String avatarUrl;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 ````
 
@@ -1838,20 +2831,17 @@ public interface NoteTagMapper extends BaseMapper<NoteTagEntity> {
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/NoteServiceApplication.java
+## File: note-service/src/main/java/com/note/service/mapper/UserMapper.java
 ````java
-package com.note.service;
+//day02
+package com.note.service.mapper;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
-public class NoteServiceApplication {
-
-	public static void main(String[] args) {
-		SpringApplication.run(NoteServiceApplication.class, args);
-	}
-
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.note.service.entity.UserEntity;
+import org.apache.ibatis.annotations.Mapper;
+@Mapper
+public interface UserMapper extends BaseMapper<UserEntity> {
 }
 ````
 
@@ -2179,271 +3169,107 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 }
 ````
 
-## File: note-service/src/main/resources/db/migration/V2__create_note_and_tag.sql
-````sql
-CREATE TABLE IF NOT EXISTS `note` (
-                                      `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
-                                      `user_id`       BIGINT       NOT NULL COMMENT '作者ID',
-                                      `title`         VARCHAR(200) NOT NULL DEFAULT '未命名笔记',
-    `content`       LONGTEXT     COMMENT 'Markdown内容',
-    `summary`       VARCHAR(500) COMMENT '纯文本摘要',
-    `is_deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '0-正常 1-回收站',
-    `deleted_at`    DATETIME     COMMENT '删除时间',
-    `created_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX `idx_user_id` (`user_id`),
-    INDEX `idx_is_deleted` (`is_deleted`),
-    INDEX `idx_updated_at` (`updated_at`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记表';
-
--- 标签关联表（简化版，不单独建标签字典表）
-
-CREATE TABLE IF NOT EXISTS `note_tag` (
-                                          `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
-                                          `note_id`       BIGINT       NOT NULL,
-                                          `tag_name`      VARCHAR(50)  NOT NULL COMMENT '标签名',
-    `created_at`    DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY `uk_note_tag` (`note_id`, `tag_name`),
-    INDEX `idx_tag_name` (`tag_name`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记标签关联表';
-````
-
-## File: note-service/src/test/java/com/note/service/NoteServiceApplicationTests.java
+## File: note-service/src/main/java/com/note/service/service/UserService.java
 ````java
-package com.note.service;
+//day02
+//package com.note.service.service;
+//
+//import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+//import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+//import com.note.service.dto.UserRegisterDTO;
+//import com.note.service.entity.UserEntity;
+//import com.note.service.mapper.UserMapper;
+//import org.springframework.stereotype.Service;
+//@Service
+//public class UserService extends ServiceImpl<UserMapper, UserEntity> {
+//
+//    public boolean register(UserRegisterDTO dto) {
+//        // 1. 判重
+//        boolean exist = baseMapper.selectCount(
+//                new QueryWrapper<UserEntity>()
+//                        .eq("username", dto.getUsername())
+//                        .or()
+//                        .eq("email", dto.getEmail())
+//        ) > 0;
+//        if (exist) return false;
+//
+//        // 2. 保存（密码先明文，Day3 再加密）
+//        UserEntity user = new UserEntity();
+//        user.setUsername(dto.getUsername());
+//        user.setPassword(dto.getPassword());
+//        user.setEmail(dto.getEmail());
+//        return save(user);
+//    }
+//}
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+//day03-登录
+package com.note.service.service;
 
-@SpringBootTest
-class NoteServiceApplicationTests {
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.note.service.common.exception.BusinessException;
+import com.note.service.dto.LoginDTO;
+import com.note.service.dto.UserRegisterDTO;
+import com.note.service.entity.UserEntity;
+import com.note.service.mapper.UserMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
-	@Test
-	void contextLoads() {
-	}
+@Service
+public class UserService extends ServiceImpl<UserMapper, UserEntity> {
 
-}
-````
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
-## File: note-ui/.gitignore
-````
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+    public void register(UserRegisterDTO dto) {
+        // 检查用户名
+        if (lambdaQuery().eq(UserEntity::getUsername, dto.getUsername()).count() > 0) {
+            throw new BusinessException(400, "用户名已存在");
+        }
 
-node_modules
-dist
-dist-ssr
-*.local
+        // 检查邮箱
+        if (lambdaQuery().eq(UserEntity::getEmail, dto.getEmail()).count() > 0) {
+            throw new BusinessException(400, "邮箱已被注册");
+        }
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-````
+        // 创建用户（密码加密）
+        UserEntity user = new UserEntity();
+        user.setUsername(dto.getUsername());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setEmail(dto.getEmail());
 
-## File: note-ui/public/vite.svg
-````xml
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
-````
-
-## File: note-ui/src/App.vue
-````vue
-<template>
-  <router-view />
-</template>
-````
-
-## File: note-ui/src/components/MarkdownEditor.vue
-````vue
-<template>
-  <div class="md-editor">
-    <div class="toolbar">
-      <el-button-group>
-        <el-button size="small" @click="insert('**', '**')">B</el-button>
-        <el-button size="small" @click="insert('*', '*')">I</el-button>
-        <el-button size="small" @click="insert('## ', '')">H</el-button>
-        <el-button size="small" @click="insert('- ', '')">List</el-button>
-        <el-button size="small" @click="insert('```\n', '\n```')">Code</el-button>
-      </el-button-group>
-
-      <el-button type="primary" size="small" :loading="saving" @click="save">
-        保存
-      </el-button>
-    </div>
-
-    <div class="editor-container">
-      <textarea
-          ref="textarea"
-          v-model="content"
-          class="edit-area"
-          placeholder="输入 Markdown..."
-          @input="onInput"
-      />
-      <div class="preview-area" v-html="renderedHtml" />
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { ref, computed, watch } from 'vue'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
-
-const props = defineProps({
-  modelValue: { type: String, default: '' },
-  saving: { type: Boolean, default: false }
-})
-
-const emit = defineEmits(['update:modelValue', 'save'])
-
-const content = ref(props.modelValue)
-const textarea = ref(null)
-
-// 配置 marked
-marked.setOptions({
-  highlight: (code, lang) => {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value
+        save(user);
     }
-    return hljs.highlightAuto(code).value
-  },
-  breaks: true,
-  gfm: true
-})
 
-const renderedHtml = computed(() => marked.parse(content.value))
+    public UserEntity login(LoginDTO dto) {
+        UserEntity user = lambdaQuery()
+                .eq(UserEntity::getUsername, dto.getUsername())
+                .one();
 
-watch(() => props.modelValue, (val) => {
-  if (val !== content.value) content.value = val
-})
+        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BusinessException(400, "用户名或密码错误");
+        }
 
-const onInput = () => {
-  emit('update:modelValue', content.value)
-}
-
-const insert = (before, after) => {
-  const el = textarea.value
-  const start = el.selectionStart
-  const end = el.selectionEnd
-  const selected = content.value.substring(start, end)
-
-  content.value = (
-      content.value.substring(0, start) +
-      before + selected + after +
-      content.value.substring(end)
-  )
-
-  emit('update:modelValue', content.value)
-
-  // 恢复光标
-  setTimeout(() => {
-    el.focus()
-    const newPos = start + before.length + selected.length
-    el.setSelectionRange(newPos, newPos)
-  }, 0)
-}
-
-const save = () => {
-  emit('save')
-}
-</script>
-
-<style scoped>
-.md-editor {
-  height: calc(100vh - 200px);
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border-radius: 4px;
-}
-
-.toolbar {
-  padding: 10px;
-  border-bottom: 1px solid #dcdfe6;
-  display: flex;
-  justify-content: space-between;
-}
-
-.editor-container {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.edit-area, .preview-area {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.edit-area {
-  border: none;
-  border-right: 1px solid #dcdfe6;
-  resize: none;
-  outline: none;
-  background: #fafafa;
-}
-
-.preview-area :deep(h1) { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-.preview-area :deep(h2) { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-.preview-area :deep(pre) { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
-.preview-area :deep(code) { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 85%; }
-.preview-area :deep(blockquote) { border-left: 4px solid #dfe2e5; padding-left: 16px; color: #6a737d; margin: 0; }
-</style>
-````
-
-## File: note-ui/src/counter.ts
-````typescript
-export function setupCounter(element: HTMLButtonElement) {
-  let counter = 0
-  const setCounter = (count: number) => {
-    counter = count
-    element.innerHTML = `count is ${counter}`
-  }
-  element.addEventListener('click', () => setCounter(counter + 1))
-  setCounter(0)
+        return user;
+    }
 }
 ````
 
-## File: note-ui/src/main.js
-````javascript
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-
-import App from './App.vue'
-import router from './router'
-
-const app = createApp(App)
-
-// 注册所有图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    app.component(key, component)
-}
-
-app.use(createPinia())
-app.use(router)
-app.use(ElementPlus)
-
-app.mount('#app')
+## File: note-ui/index.html
+````html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>note-ui</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
 ````
 
 ## File: note-ui/src/router/index.js
@@ -2557,111 +3383,6 @@ export const useUserStore = defineStore('user', () => {
         logout
     }
 })
-````
-
-## File: note-ui/src/style.css
-````css
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #3178c6aa);
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
-````
-
-## File: note-ui/src/typescript.svg
-````xml
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="32" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="#007ACC" d="M0 128v128h256V0H0z"></path><path fill="#FFF" d="m56.612 128.85l-.081 10.483h33.32v94.68h23.568v-94.68h33.321v-10.28c0-5.69-.122-10.444-.284-10.566c-.122-.162-20.4-.244-44.983-.203l-44.74.122l-.121 10.443Zm149.955-10.742c6.501 1.625 11.459 4.51 16.01 9.224c2.357 2.52 5.851 7.111 6.136 8.208c.08.325-11.053 7.802-17.798 11.988c-.244.162-1.22-.894-2.317-2.52c-3.291-4.795-6.745-6.867-12.028-7.233c-7.76-.528-12.759 3.535-12.718 10.321c0 1.992.284 3.17 1.097 4.795c1.707 3.536 4.876 5.649 14.832 9.956c18.326 7.883 26.168 13.084 31.045 20.48c5.445 8.249 6.664 21.415 2.966 31.208c-4.063 10.646-14.14 17.879-28.323 20.276c-4.388.772-14.79.65-19.504-.203c-10.28-1.828-20.033-6.908-26.047-13.572c-2.357-2.6-6.949-9.387-6.664-9.874c.122-.163 1.178-.813 2.356-1.504c1.138-.65 5.446-3.129 9.509-5.485l7.355-4.267l1.544 2.276c2.154 3.29 6.867 7.801 9.712 9.305c8.167 4.307 19.383 3.698 24.909-1.26c2.357-2.153 3.332-4.388 3.332-7.68c0-2.966-.366-4.266-1.91-6.501c-1.99-2.845-6.054-5.242-17.595-10.24c-13.206-5.69-18.895-9.224-24.096-14.832c-3.007-3.25-5.852-8.452-7.03-12.8c-.975-3.617-1.22-12.678-.447-16.335c2.723-12.76 12.353-21.659 26.25-24.3c4.51-.853 14.994-.528 19.424.569Z"></path></svg>
 ````
 
 ## File: note-ui/src/utils/request.js
@@ -2844,52 +3565,249 @@ const logout = () => {
 
 ## File: note-ui/src/views/Login.vue
 ````vue
+<!--&lt;!&ndash;原版登录页面&ndash;&gt;-->
+<!--<template>-->
+<!--  <div class="login-container">-->
+<!--    <el-card class="login-box">-->
+<!--      <h2 class="title">Note-lite 登录</h2>-->
+
+<!--      <el-form-->
+<!--          ref="formRef"-->
+<!--          :model="form"-->
+<!--          :rules="rules"-->
+<!--          @keyup.enter="handleLogin"-->
+<!--      >-->
+<!--        <el-form-item prop="username">-->
+<!--          <el-input-->
+<!--              v-model="form.username"-->
+<!--              placeholder="用户名"-->
+<!--              :prefix-icon="User"-->
+<!--              size="large"-->
+<!--          />-->
+<!--        </el-form-item>-->
+
+<!--        <el-form-item prop="password">-->
+<!--          <el-input-->
+<!--              v-model="form.password"-->
+<!--              type="password"-->
+<!--              placeholder="密码"-->
+<!--              :prefix-icon="Lock"-->
+<!--              size="large"-->
+<!--              show-password-->
+<!--          />-->
+<!--        </el-form-item>-->
+
+<!--        <el-button-->
+<!--            type="primary"-->
+<!--            size="large"-->
+<!--            :loading="loading"-->
+<!--            @click="handleLogin"-->
+<!--            style="width: 100%"-->
+<!--        >-->
+<!--          登 录-->
+<!--        </el-button>-->
+
+<!--        <div class="actions">-->
+<!--          <router-link to="/register">注册新账号</router-link>-->
+<!--        </div>-->
+<!--      </el-form>-->
+<!--    </el-card>-->
+<!--  </div>-->
+<!--</template>-->
+
+<!--<script setup>-->
+<!--import { ref, reactive } from 'vue'-->
+<!--import { useRouter } from 'vue-router'-->
+<!--import { User, Lock } from '@element-plus/icons-vue'-->
+<!--import { useUserStore } from '@/store/user'-->
+<!--import request from '@/utils/request'-->
+<!--import { ElMessage } from 'element-plus'-->
+
+<!--const router = useRouter()-->
+<!--const userStore = useUserStore()-->
+<!--const formRef = ref()-->
+<!--const loading = ref(false)-->
+
+<!--const form = reactive({-->
+<!--  username: '',-->
+<!--  password: ''-->
+<!--})-->
+
+<!--const rules = {-->
+<!--  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],-->
+<!--  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]-->
+<!--}-->
+
+<!--const handleLogin = async () => {-->
+<!--  try {-->
+<!--    await formRef.value.validate()-->
+<!--    loading.value = true-->
+
+<!--    const res = await request.post('/ums/login', {-->
+<!--      username: form.username,-->
+<!--      password: form.password-->
+<!--    })-->
+
+<!--    // 假设登录返回：{ token, userId, username }-->
+<!--    userStore.setToken(res.token)-->
+<!--    userStore.setUserInfo({-->
+<!--      userId: res.userId,-->
+<!--      username: res.username-->
+<!--    })-->
+
+<!--    ElMessage.success('登录成功')-->
+<!--    router.push('/')-->
+<!--  } catch (error) {-->
+<!--    // 错误已在拦截器提示-->
+<!--    console.error('登录失败:', error)-->
+<!--  } finally {-->
+<!--    loading.value = false-->
+<!--  }-->
+<!--}-->
+<!--</script>-->
+
+<!--<style scoped>-->
+<!--.login-container {-->
+<!--  height: 100vh;-->
+<!--  display: flex;-->
+<!--  justify-content: center;-->
+<!--  align-items: center;-->
+<!--  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);-->
+<!--}-->
+
+<!--.login-box {-->
+<!--  width: 400px;-->
+<!--  padding: 20px;-->
+<!--}-->
+
+<!--.title {-->
+<!--  text-align: center;-->
+<!--  margin-bottom: 30px;-->
+<!--  color: #333;-->
+<!--}-->
+
+<!--.actions {-->
+<!--  margin-top: 20px;-->
+<!--  text-align: center;-->
+<!--}-->
+<!--</style>-->
+
 <template>
-  <div class="login-container">
-    <el-card class="login-box">
-      <h2 class="title">Note-lite 登录</h2>
-
-      <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          @keyup.enter="handleLogin"
-      >
-        <el-form-item prop="username">
-          <el-input
-              v-model="form.username"
-              placeholder="用户名"
-              :prefix-icon="User"
-              size="large"
-          />
-        </el-form-item>
-
-        <el-form-item prop="password">
-          <el-input
-              v-model="form.password"
-              type="password"
-              placeholder="密码"
-              :prefix-icon="Lock"
-              size="large"
-              show-password
-          />
-        </el-form-item>
-
-        <el-button
-            type="primary"
-            size="large"
-            :loading="loading"
-            @click="handleLogin"
-            style="width: 100%"
-        >
-          登 录
-        </el-button>
-
-        <div class="actions">
-          <router-link to="/register">注册新账号</router-link>
+  <div class="login-page">
+    <!-- 左侧装饰区 -->
+    <div class="left-panel">
+      <div class="brand">
+        <div class="logo-mark">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="24" height="24" rx="6" fill="white" fill-opacity="0.15"/>
+            <rect x="4" y="4" width="24" height="24" rx="6" stroke="white" stroke-opacity="0.4" stroke-width="1"/>
+            <line x1="10" y1="12" x2="22" y2="12" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="10" y1="17" x2="19" y2="17" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="10" y1="22" x2="15" y2="22" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
         </div>
-      </el-form>
-    </el-card>
+        <span class="brand-name">Note-lite</span>
+      </div>
+
+      <div class="left-content">
+        <h1 class="left-title">记录每一个<br>灵感瞬间</h1>
+        <p class="left-desc">支持 Markdown 编辑、标签分类、草稿自动保存，让思考有处安放。</p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-dot"></div>
+            <span>Markdown 实时预览</span>
+          </div>
+          <div class="feature-item">
+            <div class="feature-dot"></div>
+            <span>标签筛选与管理</span>
+          </div>
+          <div class="feature-item">
+            <div class="feature-dot"></div>
+            <span>草稿自动保存</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 背景装饰圆 -->
+      <div class="deco-circle deco-1"></div>
+      <div class="deco-circle deco-2"></div>
+    </div>
+
+    <!-- 右侧表单区 -->
+    <div class="right-panel">
+      <div class="form-container">
+        <div class="form-header">
+          <h2 class="form-title">欢迎回来</h2>
+          <p class="form-subtitle">登录以继续使用</p>
+        </div>
+
+        <el-form
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            class="login-form"
+            @keyup.enter="handleLogin"
+        >
+          <div class="field-group">
+            <label class="field-label">用户名</label>
+            <el-form-item prop="username">
+              <el-input
+                  v-model="form.username"
+                  placeholder="请输入用户名"
+                  size="large"
+                  class="custom-input"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><User /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+          </div>
+
+          <div class="field-group">
+            <div class="label-row">
+              <label class="field-label">密码</label>
+            </div>
+            <el-form-item prop="password">
+              <el-input
+                  v-model="form.password"
+                  type="password"
+                  placeholder="请输入密码"
+                  size="large"
+                  show-password
+                  class="custom-input"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+          </div>
+
+          <button
+              class="login-btn"
+              :class="{ loading: loading }"
+              :disabled="loading"
+              @click.prevent="handleLogin"
+          >
+            <span v-if="!loading">登录</span>
+            <span v-else class="loading-content">
+              <svg class="spin" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="2.5"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+              登录中...
+            </span>
+          </button>
+        </el-form>
+
+        <div class="form-footer">
+          <span class="footer-text">还没有账号？</span>
+          <router-link to="/register" class="register-link">立即注册</router-link>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -2926,7 +3844,6 @@ const handleLogin = async () => {
       password: form.password
     })
 
-    // 假设登录返回：{ token, userId, username }
     userStore.setToken(res.token)
     userStore.setUserInfo({
       userId: res.userId,
@@ -2936,7 +3853,6 @@ const handleLogin = async () => {
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error) {
-    // 错误已在拦截器提示
     console.error('登录失败:', error)
   } finally {
     loading.value = false
@@ -2945,55 +3861,586 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-.login-container {
-  height: 100vh;
+.login-page {
   display: flex;
-  justify-content: center;
+  height: 100vh;
+  background: #f8f7f4;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+}
+
+/* ===== 左侧装饰区 ===== */
+.left-panel {
+  width: 45%;
+  background: linear-gradient(150deg, #4a42b0 0%, #6b5ce7 50%, #8b7cf8 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 40px 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
-.login-box {
-  width: 400px;
-  padding: 20px;
+.logo-mark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
 }
 
-.title {
+.logo-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.brand-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.5px;
+}
+
+.left-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  padding-bottom: 40px;
+}
+
+.left-title {
+  font-size: 38px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.25;
+  margin: 0 0 20px 0;
+  letter-spacing: -0.5px;
+}
+
+.left-desc {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.7;
+  margin: 0 0 36px 0;
+  max-width: 320px;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.feature-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+/* 装饰圆 */
+.deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+.deco-1 {
+  width: 360px;
+  height: 360px;
+  bottom: -120px;
+  right: -100px;
+}
+
+.deco-2 {
+  width: 200px;
+  height: 200px;
+  top: 80px;
+  right: 40px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ===== 右侧表单区 ===== */
+.right-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: #f8f7f4;
+}
+
+.form-container {
+  width: 100%;
+  max-width: 380px;
+}
+
+.form-header {
+  margin-bottom: 36px;
+}
+
+.form-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.form-subtitle {
+  font-size: 15px;
+  color: #8b8fa8;
+  margin: 0;
+}
+
+/* 表单字段 */
+.login-form {
+  margin-bottom: 24px;
+}
+
+.field-group {
+  margin-bottom: 20px;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a4a6a;
+  margin-bottom: 8px;
+}
+
+/* 覆盖 Element Plus input 样式 */
+.custom-input :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  border: 1.5px solid #e8e6f0;
+  background: white;
+  box-shadow: none !important;
+  padding: 4px 14px;
+  transition: border-color 0.2s;
+}
+
+.custom-input :deep(.el-input__wrapper:hover) {
+  border-color: #c5bff0;
+}
+
+.custom-input :deep(.el-input__wrapper.is-focus) {
+  border-color: #6b5ce7;
+  box-shadow: 0 0 0 3px rgba(107, 92, 231, 0.1) !important;
+}
+
+.custom-input :deep(.el-input__inner) {
+  font-size: 14px;
+  color: #1a1a2e;
+  height: 40px;
+}
+
+.custom-input :deep(.el-input__inner::placeholder) {
+  color: #c0bdd4;
+}
+
+.input-icon {
+  color: #b0aec8;
+  font-size: 15px;
+}
+
+/* 取消 el-form-item 默认 margin */
+.field-group :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+/* 登录按钮 */
+.login-btn {
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, #5a50d8 0%, #7b6ef0 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.2s, transform 0.15s;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spin {
+  width: 18px;
+  height: 18px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 底部链接 */
+.form-footer {
   text-align: center;
-  margin-bottom: 30px;
-  color: #333;
 }
 
-.actions {
-  margin-top: 20px;
-  text-align: center;
+.footer-text {
+  font-size: 14px;
+  color: #8b8fa8;
+}
+
+.register-link {
+  font-size: 14px;
+  color: #6b5ce7;
+  font-weight: 500;
+  text-decoration: none;
+  margin-left: 4px;
+  transition: opacity 0.15s;
+}
+
+.register-link:hover {
+  opacity: 0.75;
+}
+
+/* 响应式：小屏隐藏左侧 */
+@media (max-width: 768px) {
+  .left-panel {
+    display: none;
+  }
+  .right-panel {
+    padding: 24px;
+  }
 }
 </style>
 ````
 
 ## File: note-ui/src/views/NoteEdit.vue
 ````vue
+<!--修改前代码-->
+<!--<template>-->
+<!--  <div class="note-edit">-->
+<!--    <el-input-->
+<!--        v-model="title"-->
+<!--        placeholder="输入标题..."-->
+<!--        class="title-input"-->
+<!--        size="large"-->
+<!--    />-->
+
+<!--    <MarkdownEditor-->
+<!--        v-model="content"-->
+<!--        :saving="saving"-->
+<!--        @save="handleSave"-->
+<!--    />-->
+<!--  </div>-->
+<!--</template>-->
+
+<!--<script setup>-->
+<!--import { ref, onMounted , onUnmounted, watch } from 'vue'-->
+<!--import { useRoute, useRouter } from 'vue-router'-->
+<!--import { ElMessage, ElMessageBox } from 'element-plus'//day05总修改导入-->
+<!--import request from '@/utils/request'-->
+<!--import MarkdownEditor from '@/components/MarkdownEditor.vue'-->
+<!--import { debounce } from 'lodash-es'-->
+
+<!--const route = useRoute()-->
+<!--const router = useRouter()-->
+
+<!--const noteId = ref(route.params.id ? Number(route.params.id) : null)-->
+<!--const title = ref('')-->
+<!--const content = ref('')-->
+<!--const saving = ref(false)-->
+
+<!--// 加载已有笔记-->
+<!--onMounted(async () => {-->
+<!--  if (noteId.value) {-->
+<!--    try {-->
+<!--      const res = await request.get(`/note/${noteId.value}`)-->
+<!--      title.value = res.title-->
+<!--      content.value = res.content-->
+<!--    } catch (error) {-->
+<!--      ElMessage.error('加载笔记失败')-->
+<!--      router.push('/')-->
+<!--    }-->
+<!--  }-->
+<!--  //加载草稿-->
+<!--  await loadDraft()-->
+<!--})-->
+
+<!--const handleSave = async () => {-->
+<!--  if (!title.value.trim()) {-->
+<!--    ElMessage.warning('请输入标题')-->
+<!--    return-->
+<!--  }-->
+
+<!--  saving.value = true-->
+<!--  try {-->
+<!--    const payload = {-->
+<!--      title: title.value,-->
+<!--      content: content.value,-->
+<!--      tags: []  // 暂不实现标签编辑-->
+<!--    }-->
+
+<!--    let res-->
+<!--    if (noteId.value) {-->
+<!--      await request.put(`/note/${noteId.value}`, payload)-->
+<!--      ElMessage.success('保存成功')-->
+<!--    } else {-->
+<!--      const res = await request.post('/note', payload)-->
+<!--      noteId.value = res-->
+<!--      ElMessage.success('创建成功')-->
+<!--      // 更新 URL，避免重复创建-->
+<!--      await router.replace(`/note/${noteId.value}`)-->
+
+<!--      // ✅ 手动清除 new 草稿（clearDraft 此时已用新 noteId，清的不是 :new）-->
+<!--      await request.delete('/note/draft', { params: {} })  // 无 noteId 参数 = 清 :new-->
+<!--      await clearDraft()  // 再清带 noteId 的（以防万一）-->
+<!--    }-->
+<!--    //保存成功后清除草稿-->
+<!--    await clearDraft()-->
+<!--    // ✅ 跳转到列表页，并添加 refresh 参数强制刷新-->
+<!--    router.push({ path: '/', query: { refresh: Date.now() } })-->
+<!--  } catch (error) {-->
+<!--    // 错误已在拦截器处理-->
+<!--  } finally {-->
+<!--    saving.value = false-->
+<!--  }-->
+<!--}-->
+
+<!--// 自动保存定时器-->
+<!--// let autoSaveTimer = null-->
+<!--const autoSave = debounce(async () => {-->
+<!--  if (!title.value && !content.value) return-->
+
+<!--  try {-->
+<!--    const payload = {-->
+<!--      id: noteId.value,-->
+<!--      title: title.value,-->
+<!--      content: content.value,-->
+<!--      tags: []-->
+<!--    }-->
+
+<!--    await request.post('/note/draft', payload)-->
+<!--    console.log('草稿已自动保存')-->
+<!--  } catch (error) {-->
+<!--    console.error('自动保存失败:', error)-->
+<!--  }-->
+<!--}, 3000)  // 3秒防抖-->
+
+<!--// 监听内容变化-->
+<!--watch([title, content], () => {-->
+<!--  autoSave()-->
+<!--}, { deep: true })-->
+
+<!--// 加载草稿-->
+<!--const loadDraft = async () => {-->
+<!--  try {-->
+<!--    const params = noteId.value ? { noteId: noteId.value } : {}-->
+<!--    const res = await request.get('/note/draft', { params })-->
+
+<!--  //   if (res) {-->
+<!--  //     // 如果有草稿，询问是否恢复-->
+<!--  //     ElMessageBox.confirm('检测到未保存的草稿，是否恢复？', '提示', {-->
+<!--  //       confirmButtonText: '恢复',-->
+<!--  //       cancelButtonText: '丢弃',-->
+<!--  //       type: 'info'-->
+<!--  //     }).then(() => {-->
+<!--  //       title.value = res.title || ''-->
+<!--  //       content.value = res.content || ''-->
+<!--  //     }).catch(() => {-->
+<!--  //       // 丢弃草稿-->
+<!--  //       clearDraft()-->
+<!--  //     })-->
+<!--  //   }-->
+<!--  // } catch (error) {-->
+<!--  //   console.error('加载草稿失败:', error)-->
+<!--  // }-->
+<!--    if (!res) return  // 没有草稿，直接返回-->
+
+<!--    // 草稿和当前内容完全一样，不打扰用户-->
+<!--    if (res.title === title.value && res.content === content.value) {-->
+<!--      return-->
+<!--    }-->
+
+<!--    ElMessageBox.confirm(-->
+<!--        `检测到草稿："${res.title || '无标题'}"，是否恢复？`,-->
+<!--        '提示',-->
+<!--        {-->
+<!--          confirmButtonText: '恢复草稿',-->
+<!--          cancelButtonText: '丢弃',-->
+<!--          type: 'info'-->
+<!--        }-->
+<!--    ).then(() => {-->
+<!--      title.value = res.title || ''-->
+<!--      content.value = res.content || ''-->
+<!--    }).catch(() => {-->
+<!--      clearDraft()-->
+<!--    })-->
+<!--  } catch (error) {-->
+<!--    console.error('加载草稿失败:', error)-->
+<!--  }-->
+<!--}-->
+
+<!--// 清除草稿-->
+<!--const clearDraft = async () => {-->
+<!--  try {-->
+<!--    const params = noteId.value ? { noteId: noteId.value } : {}-->
+<!--    await request.delete('/note/draft', { params })-->
+<!--  } catch (error) {-->
+<!--    console.error('清除草稿失败:', error)-->
+<!--  }-->
+<!--}-->
+
+<!--// 组件卸载时清除定时器-->
+<!--onUnmounted(() => {-->
+<!--  // if (autoSaveTimer) {-->
+<!--  //   clearTimeout(autoSaveTimer)-->
+<!--  // }-->
+<!--  autoSave.cancel()-->
+<!--})-->
+
+<!--</script>-->
+
+<!--<style scoped>-->
+<!--.note-edit {-->
+<!--  max-width: 1400px;-->
+<!--  margin: 0 auto;-->
+<!--}-->
+
+<!--.title-input {-->
+<!--  margin-bottom: 20px;-->
+<!--}-->
+
+<!--.title-input :deep(.el-input__inner) {-->
+<!--  font-size: 24px;-->
+<!--  font-weight: bold;-->
+<!--  border: none;-->
+<!--  border-bottom: 2px solid #dcdfe6;-->
+<!--  border-radius: 0;-->
+<!--  padding: 10px 0;-->
+<!--}-->
+
+<!--.title-input :deep(.el-input__inner:focus) {-->
+<!--  border-bottom-color: #409eff;-->
+<!--}-->
+<!--</style>-->
+
+<!--修改后代码-->
 <template>
   <div class="note-edit">
-    <el-input
-        v-model="title"
-        placeholder="输入标题..."
-        class="title-input"
-        size="large"
-    />
 
+    <!-- 顶部操作栏 -->
+    <div class="edit-header">
+      <button class="back-btn" @click="handleBack">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        返回
+      </button>
+
+      <div class="header-center">
+        <!-- 草稿状态提示 -->
+        <transition name="fade">
+          <span v-if="draftStatus" class="draft-hint" :class="draftStatus">
+            <svg v-if="draftStatus === 'saved'" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M4 6l1.5 1.5L8 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg v-else class="spin-sm" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5"/>
+              <path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            {{ draftStatus === 'saved' ? '草稿已保存' : '保存中...' }}
+          </span>
+        </transition>
+      </div>
+
+      <button
+          class="save-btn"
+          :class="{ loading: saving }"
+          :disabled="saving"
+          @click="handleSave"
+      >
+        <svg v-if="!saving" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg v-else class="spin-sm" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"/>
+          <path d="M8 1.5a6.5 6.5 0 0 1 6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        {{ saving ? '保存中' : '保存' }}
+      </button>
+    </div>
+
+    <!-- 标题输入 -->
+    <div class="title-area">
+      <input
+          v-model="title"
+          class="title-input"
+          placeholder="输入标题..."
+          maxlength="200"
+      />
+      <span class="title-count" :class="{ warn: title.length > 180 }">
+        {{ title.length }}/200
+      </span>
+    </div>
+
+    <!-- Markdown 编辑器 -->
     <MarkdownEditor
         v-model="content"
         :saving="saving"
         @save="handleSave"
     />
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted , onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'//day05总修改导入
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { debounce } from 'lodash-es'
@@ -3005,6 +4452,9 @@ const noteId = ref(route.params.id ? Number(route.params.id) : null)
 const title = ref('')
 const content = ref('')
 const saving = ref(false)
+const draftStatus = ref('') // '' | 'saving' | 'saved'
+
+let draftHideTimer = null
 
 // 加载已有笔记
 onMounted(async () => {
@@ -3016,12 +4466,18 @@ onMounted(async () => {
     } catch (error) {
       ElMessage.error('加载笔记失败')
       router.push('/')
+      return
     }
   }
-  //加载草稿
   await loadDraft()
 })
 
+// 返回按钮
+const handleBack = () => {
+  router.push('/')
+}
+
+// 保存
 const handleSave = async () => {
   if (!title.value.trim()) {
     ElMessage.warning('请输入标题')
@@ -3033,10 +4489,9 @@ const handleSave = async () => {
     const payload = {
       title: title.value,
       content: content.value,
-      tags: []  // 暂不实现标签编辑
+      tags: []
     }
 
-    let res
     if (noteId.value) {
       await request.put(`/note/${noteId.value}`, payload)
       ElMessage.success('保存成功')
@@ -3044,12 +4499,13 @@ const handleSave = async () => {
       const res = await request.post('/note', payload)
       noteId.value = res
       ElMessage.success('创建成功')
-      // 更新 URL，避免重复创建
       await router.replace(`/note/${noteId.value}`)
+      // 清除 :new 草稿
+      await request.delete('/note/draft', { params: {} })
+      await clearDraft()
     }
-    //保存成功后清除草稿
+
     await clearDraft()
-    // ✅ 跳转到列表页，并添加 refresh 参数强制刷新
     router.push({ path: '/', query: { refresh: Date.now() } })
   } catch (error) {
     // 错误已在拦截器处理
@@ -3058,27 +4514,30 @@ const handleSave = async () => {
   }
 }
 
-// 自动保存定时器
-let autoSaveTimer = null
+// 自动保存（防抖 3 秒）
 const autoSave = debounce(async () => {
   if (!title.value && !content.value) return
 
+  draftStatus.value = 'saving'
   try {
-    const payload = {
+    await request.post('/note/draft', {
       id: noteId.value,
       title: title.value,
       content: content.value,
       tags: []
-    }
-
-    await request.post('/note/draft', payload)
-    console.log('草稿已自动保存')
+    })
+    draftStatus.value = 'saved'
+    // 2 秒后隐藏提示
+    clearTimeout(draftHideTimer)
+    draftHideTimer = setTimeout(() => {
+      draftStatus.value = ''
+    }, 2000)
   } catch (error) {
+    draftStatus.value = ''
     console.error('自动保存失败:', error)
   }
-}, 3000)  // 3秒防抖
+}, 3000)
 
-// 监听内容变化
 watch([title, content], () => {
   autoSave()
 }, { deep: true })
@@ -3089,20 +4548,24 @@ const loadDraft = async () => {
     const params = noteId.value ? { noteId: noteId.value } : {}
     const res = await request.get('/note/draft', { params })
 
-    if (res) {
-      // 如果有草稿，询问是否恢复
-      ElMessageBox.confirm('检测到未保存的草稿，是否恢复？', '提示', {
-        confirmButtonText: '恢复',
-        cancelButtonText: '丢弃',
-        type: 'info'
-      }).then(() => {
-        title.value = res.title || ''
-        content.value = res.content || ''
-      }).catch(() => {
-        // 丢弃草稿
-        clearDraft()
-      })
-    }
+    if (!res) return
+
+    if (res.title === title.value && res.content === content.value) return
+
+    ElMessageBox.confirm(
+        `检测到草稿："${res.title || '无标题'}"，是否恢复？`,
+        '恢复草稿',
+        {
+          confirmButtonText: '恢复草稿',
+          cancelButtonText: '丢弃',
+          type: 'info'
+        }
+    ).then(() => {
+      title.value = res.title || ''
+      content.value = res.content || ''
+    }).catch(() => {
+      clearDraft()
+    })
   } catch (error) {
     console.error('加载草稿失败:', error)
   }
@@ -3118,68 +4581,257 @@ const clearDraft = async () => {
   }
 }
 
-// 组件卸载时清除定时器
 onUnmounted(() => {
-  // if (autoSaveTimer) {
-  //   clearTimeout(autoSaveTimer)
-  // }
   autoSave.cancel()
+  clearTimeout(draftHideTimer)
 })
-
 </script>
 
 <style scoped>
 .note-edit {
-  max-width: 1400px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px); /* 减去 Layout header 高度 */
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* ===== 顶部操作栏 ===== */
+.edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 16px 0;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: white;
+  border: 1px solid #e8e6f0;
+  border-radius: 9px;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: #4a4a6a;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.back-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.back-btn:hover {
+  background: #f5f3ff;
+  border-color: #c8c5e8;
+  color: #5a50d8;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+/* 草稿状态提示 */
+.draft-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 20px;
+}
+
+.draft-hint svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.draft-hint.saved {
+  color: #2e7d5a;
+  background: #edf7f2;
+}
+
+.draft-hint.saving {
+  color: #7a6a30;
+  background: #fdf8e6;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 保存按钮 */
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #5a50d8 0%, #7b6ef0 100%);
+  color: white;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.save-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.save-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spin-sm {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 标题区域 ===== */
+.title-area {
+  position: relative;
+  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .title-input {
-  margin-bottom: 20px;
-}
-
-.title-input :deep(.el-input__inner) {
-  font-size: 24px;
-  font-weight: bold;
+  width: 100%;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
   border: none;
-  border-bottom: 2px solid #dcdfe6;
+  border-bottom: 2px solid #e8e6f0;
   border-radius: 0;
-  padding: 10px 0;
+  padding: 8px 60px 12px 2px;
+  outline: none;
+  background: transparent;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  letter-spacing: -0.5px;
+  transition: border-color 0.2s;
+  line-height: 1.3;
 }
 
-.title-input :deep(.el-input__inner:focus) {
-  border-bottom-color: #409eff;
+.title-input::placeholder {
+  color: #c0bdd4;
+  font-weight: 400;
+}
+
+.title-input:focus {
+  border-bottom-color: #6b5ce7;
+}
+
+.title-count {
+  position: absolute;
+  right: 4px;
+  bottom: 14px;
+  font-size: 11px;
+  color: #c0bdd4;
+  transition: color 0.2s;
+  pointer-events: none;
+}
+
+.title-count.warn {
+  color: #d47a5a;
+}
+
+/* ===== Markdown 编辑器区域 ===== */
+/* 让 MarkdownEditor 组件撑满剩余高度 */
+.note-edit :deep(.md-editor) {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid #f0eef8;
+  overflow: hidden;
+}
+
+.note-edit :deep(.toolbar) {
+  background: white;
+  border-bottom: 1px solid #f0eef8;
+  padding: 10px 16px;
+}
+
+.note-edit :deep(.edit-area) {
+  background: #faf9fe;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #2a2a3e;
+}
+
+.note-edit :deep(.preview-area) {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #2a2a3e;
+}
+
+.note-edit :deep(.preview-area h1),
+.note-edit :deep(.preview-area h2) {
+  border-bottom-color: #f0eef8;
 }
 </style>
 ````
 
 ## File: note-ui/src/views/NoteList.vue
 ````vue
-<template>
-  <div class="note-list">
-    <div class="header">
-      <h3>我的笔记</h3>
-      <div class="header-right">
-        <!-- ✅ 添加搜索框 -->
-        <el-input
-            v-model="keyword"
-            placeholder="搜索笔记..."
-            style="width: 200px"
-            @keyup.enter="loadNotes"
-        />
-        <TagFilter
-            v-model="selectedTags"
-            v-model:match-mode="tagMatch"
-            :all-tags="allTags"
-            @change="handleTagFilter"
-        />
-        </div>
-      <el-button type="primary" @click="createNote">
-        <el-icon><Plus /></el-icon> 新建笔记
-      </el-button>
-    </div>
+<!--主页面原代码-->
+<!--<template>-->
+<!--  <div class="note-list">-->
+<!--    <div class="header">-->
+<!--      <h3>我的笔记</h3>-->
+<!--      <div class="header-right">-->
+<!--        &lt;!&ndash; ✅ 添加搜索框 &ndash;&gt;-->
+<!--        <el-input-->
+<!--            v-model="keyword"-->
+<!--            placeholder="搜索笔记..."-->
+<!--            style="width: 200px"-->
+<!--            @keyup.enter="loadNotes"-->
+<!--        />-->
+<!--        <TagFilter-->
+<!--            v-model="selectedTags"-->
+<!--            v-model:match-mode="tagMatch"-->
+<!--            :all-tags="allTags"-->
+<!--            @change="handleTagFilter"-->
+<!--        />-->
+<!--        </div>-->
+<!--      <el-button type="primary" @click="createNote">-->
+<!--        <el-icon><Plus /></el-icon> 新建笔记-->
+<!--      </el-button>-->
+<!--    </div>-->
 
-    <el-empty v-if="!loading && notes.length === 0" description="暂无笔记，点击右上角创建" />
+<!--    <el-empty v-if="!loading && notes.length === 0" description="暂无笔记，点击右上角创建" />-->
+
 
 <!--    <div v-else class="list">-->
 <!--      <el-card-->
@@ -3187,95 +4839,392 @@ onUnmounted(() => {
 <!--          :key="note.id"-->
 <!--          class="note-card"-->
 <!--          shadow="hover"-->
-<!--          @click="editNote(note.id)"-->
 <!--      >-->
-<!--        <h4 class="title">{{ note.title }}</h4>-->
-<!--        <p class="summary">{{ note.summary || '暂无摘要' }}</p>-->
-<!--        <div class="meta">-->
-<!--          <el-tag v-for="tag in note.tags" :key="tag" size="small" class="tag">-->
-<!--            {{ tag }}-->
-<!--          </el-tag>-->
-<!--          <span class="time">{{ formatTime(note.updatedAt) }}</span>-->
+<!--        <div @click="editNote(note.id)" class="card-content">-->
+<!--          <h4 class="title">{{ note.title }}</h4>-->
+<!--          <p class="summary">{{ note.summary || '暂无摘要' }}</p>-->
+<!--          <div class="meta">-->
+<!--            <el-tag v-for="tag in note.tags" :key="tag" size="small" class="tag">-->
+<!--              {{ tag }}-->
+<!--            </el-tag>-->
+<!--            <span class="time">{{ formatTime(note.updatedAt) }}</span>-->
+<!--          </div>-->
+<!--        </div>-->
+<!--        <div class="card-actions">-->
+<!--          <el-button-->
+<!--              type="danger"-->
+<!--              size="small"-->
+<!--              :icon="Delete"-->
+<!--              circle-->
+<!--              @click.stop="softDelete(note.id)"-->
+<!--          />-->
 <!--        </div>-->
 <!--      </el-card>-->
 <!--    </div>-->
-    <div v-else class="list">
-      <el-card
+
+<!--    <el-pagination-->
+<!--        v-if="total > 0"-->
+<!--        v-model:current-page="pageNum"-->
+<!--        :page-size="pageSize"-->
+<!--        :total="total"-->
+<!--        layout="prev, pager, next"-->
+<!--        @current-change="loadNotes"-->
+<!--    />-->
+<!--  </div>-->
+<!--</template>-->
+
+<!--<script setup>-->
+<!--import { ref, onMounted, onActivated} from 'vue'-->
+<!--import { useRouter, useRoute, onBeforeRouteUpdate} from 'vue-router'-->
+<!--import { Plus } from '@element-plus/icons-vue'-->
+<!--import request from '@/utils/request'-->
+<!--import TagFilter from '@/components/TagFilter.vue'//day05新增-->
+<!--import { Delete } from '@element-plus/icons-vue'//day05新增笔记删除方法-->
+<!--import { ElMessage, ElMessageBox } from 'element-plus'//day05总修改导入-->
+
+<!--const router = useRouter()-->
+<!--const route = useRoute()-->
+<!--const notes = ref([])-->
+<!--const loading = ref(false)-->
+<!--const pageNum = ref(1)-->
+<!--const pageSize = ref(20)-->
+<!--const total = ref(0)-->
+<!--const selectedTags = ref([])//day05新增-->
+<!--const tagMatch = ref('ANY')-->
+<!--const allTags = ref([])-->
+<!--const keyword=ref('')-->
+
+<!--// 修改 loadNotes 方法-->
+<!--const loadNotes = async () => {-->
+<!--  loading.value = true-->
+<!--  try {-->
+<!--    const params = {-->
+<!--      pageNum: pageNum.value,-->
+<!--      pageSize: pageSize.value-->
+<!--    }-->
+
+<!--    if (selectedTags.value.length > 0) {-->
+<!--      params.tags = selectedTags.value-->
+<!--      params.tagMatch = tagMatch.value-->
+<!--    }-->
+
+<!--    if (keyword.value) {-->
+<!--      params.keyword = keyword.value-->
+<!--    }-->
+
+<!--    const res = await request.get('/note/page', { params })-->
+
+<!--    notes.value = res.records-->
+<!--    total.value = res.total-->
+<!--  } finally {-->
+<!--    loading.value = false-->
+<!--  }-->
+<!--}-->
+
+<!--const createNote = () => {-->
+<!--  router.push('/note/new')-->
+<!--}-->
+
+<!--const editNote = (id) => {-->
+<!--  router.push(`/note/${id}`)-->
+<!--}-->
+
+<!--const formatTime = (time) => {-->
+<!--  if (!time) return ''-->
+<!--  return new Date(time).toLocaleString('zh-CN', {-->
+<!--    month: 'short',-->
+<!--    day: 'numeric',-->
+<!--    hour: '2-digit',-->
+<!--    minute: '2-digit'-->
+<!--  })-->
+<!--}-->
+
+<!--// 加载所有标签（用于筛选下拉）-->
+<!--const loadAllTags = async () => {-->
+<!--  try {-->
+<!--    const res = await request.get('/note/tags')-->
+<!--    allTags.value = res-->
+<!--  } catch (error) {-->
+<!--    console.error('加载标签失败:', error)-->
+<!--  }-->
+<!--}-->
+
+<!--// 处理标签筛选-->
+<!--const handleTagFilter = () => {-->
+<!--  pageNum.value = 1-->
+<!--  loadNotes()-->
+<!--}-->
+
+<!--// 方案 A：使用 onActivated（缓存组件时的最佳实践）-->
+<!--// ✅ 当从其他路由返回到这个组件时调用-->
+<!--// onActivated(() => {-->
+<!--//   // 检查 query 参数是否需要刷新-->
+<!--//   if (route.query.refresh) {-->
+<!--//     loadNotes()-->
+<!--//   }-->
+<!--// })-->
+
+<!--onMounted(()=>{-->
+<!--  loadNotes()-->
+<!--  loadAllTags()-->
+<!--})-->
+
+<!--//添加笔记删除方法-->
+<!--const softDelete = async (id) => {-->
+<!--  try {-->
+<!--    await ElMessageBox.confirm('确定将笔记移入回收站吗？', '提示', {-->
+<!--      type: 'warning'-->
+<!--    })-->
+<!--    await request.delete(`/note/${id}`)  // 默认软删除-->
+<!--    ElMessage.success('已移入回收站')-->
+<!--    loadNotes()-->
+<!--  } catch (error) {-->
+<!--    if (error !== 'cancel') {-->
+<!--      console.error('删除失败:', error)-->
+<!--    }-->
+<!--  }-->
+<!--}-->
+
+<!--</script>-->
+
+<!--<style scoped>-->
+<!--.note-list {-->
+<!--  max-width: 1200px;-->
+<!--  margin: 0 auto;-->
+<!--}-->
+
+<!--.header {-->
+<!--  display: flex;-->
+<!--  justify-content: space-between;-->
+<!--  align-items: center;-->
+<!--  margin-bottom: 20px;-->
+<!--}-->
+
+<!--.list {-->
+<!--  display: grid;-->
+<!--  gap: 15px;-->
+<!--}-->
+
+<!--.note-card {-->
+<!--  cursor: pointer;-->
+<!--  transition: transform 0.2s;-->
+<!--  position: relative;-->
+<!--}-->
+
+<!--.card-content {-->
+<!--  padding-right: 40px;  /* 为删除按钮留出空间 */-->
+<!--}-->
+
+<!--.note-card:hover {-->
+<!--  transform: translateY(-2px);-->
+<!--}-->
+
+<!--.card-actions {-->
+<!--  position: absolute;-->
+<!--  top: 20px;-->
+<!--  right: 20px;-->
+<!--  opacity: 0;-->
+<!--  transition: opacity 0.2s;-->
+<!--}-->
+
+<!--.note-card:hover .card-actions {-->
+<!--  opacity: 1;-->
+<!--}-->
+
+<!--.title {-->
+<!--  margin: 0 0 10px 0;-->
+<!--  color: #303133;-->
+<!--}-->
+
+<!--.summary {-->
+<!--  color: #606266;-->
+<!--  font-size: 14px;-->
+<!--  margin-bottom: 10px;-->
+<!--  line-height: 1.5;-->
+<!--  display: -webkit-box;-->
+<!--  -webkit-line-clamp: 2;-->
+<!--  -webkit-box-orient: vertical;-->
+<!--  overflow: hidden;-->
+<!--}-->
+
+<!--.meta {-->
+<!--  display: flex;-->
+<!--  align-items: center;-->
+<!--  gap: 10px;-->
+<!--  flex-wrap: wrap;-->
+<!--}-->
+
+<!--.tag {-->
+<!--  margin-right: 5px;-->
+<!--}-->
+
+<!--.time {-->
+<!--  color: #909399;-->
+<!--  font-size: 12px;-->
+<!--  margin-left: auto;-->
+<!--}-->
+<!--</style>-->
+
+<!--主页面新代码-->
+<template>
+  <div class="note-list">
+
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <h2 class="page-title">我的笔记</h2>
+        <span class="note-count">{{ total }} 篇</span>
+      </div>
+      <div class="toolbar-right">
+        <div class="search-wrapper">
+          <el-icon class="search-icon"><Search /></el-icon>
+          <input
+              v-model="keyword"
+              class="search-input"
+              placeholder="搜索笔记..."
+              @keyup.enter="loadNotes"
+          />
+        </div>
+        <TagFilter
+            v-model="selectedTags"
+            v-model:match-mode="tagMatch"
+            :all-tags="allTags"
+            @change="handleTagFilter"
+        />
+        <button class="new-btn" @click="createNote">
+          <el-icon><Plus /></el-icon>
+          新建笔记
+        </button>
+      </div>
+    </div>
+
+    <!-- 统计行 -->
+    <div class="stats-row" v-if="!loading && notes.length > 0">
+      <div class="stat-item">
+        <span class="stat-num">{{ total }}</span>
+        <span class="stat-label">全部笔记</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">{{ allTags.length }}</span>
+        <span class="stat-label">标签总数</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">{{ selectedTags.length > 0 ? notes.length : '-' }}</span>
+        <span class="stat-label">当前筛选</span>
+      </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-if="!loading && notes.length === 0" class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 64 64" fill="none">
+          <rect x="8" y="12" width="48" height="40" rx="6" stroke="#c8c5e8" stroke-width="2"/>
+          <line x1="20" y1="24" x2="44" y2="24" stroke="#c8c5e8" stroke-width="2" stroke-linecap="round"/>
+          <line x1="20" y1="32" x2="38" y2="32" stroke="#c8c5e8" stroke-width="2" stroke-linecap="round"/>
+          <line x1="20" y1="40" x2="30" y2="40" stroke="#c8c5e8" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="empty-title">还没有笔记</p>
+      <p class="empty-sub">点击「新建笔记」开始记录</p>
+      <button class="empty-btn" @click="createNote">
+        <el-icon><Plus /></el-icon>
+        新建笔记
+      </button>
+    </div>
+
+    <!-- 加载骨架屏 -->
+    <div v-if="loading" class="note-grid">
+      <div v-for="i in 6" :key="i" class="skeleton-card">
+        <div class="skeleton-tag"></div>
+        <div class="skeleton-title"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    </div>
+
+    <!-- 笔记网格 -->
+    <div v-if="!loading && notes.length > 0" class="note-grid">
+      <div
           v-for="note in notes"
           :key="note.id"
           class="note-card"
-          shadow="hover"
+          :class="getCardAccent(note)"
+          @click="editNote(note.id)"
       >
-        <div @click="editNote(note.id)" class="card-content">
-          <h4 class="title">{{ note.title }}</h4>
-          <p class="summary">{{ note.summary || '暂无摘要' }}</p>
-          <div class="meta">
-            <el-tag v-for="tag in note.tags" :key="tag" size="small" class="tag">
-              {{ tag }}
-            </el-tag>
-            <span class="time">{{ formatTime(note.updatedAt) }}</span>
-          </div>
+        <!-- 标签行 -->
+        <div class="card-tags" v-if="note.tags && note.tags.length > 0">
+          <span
+              v-for="tag in note.tags.slice(0, 3)"
+              :key="tag"
+              class="tag-pill"
+          >{{ tag }}</span>
+          <span v-if="note.tags.length > 3" class="tag-more">+{{ note.tags.length - 3 }}</span>
         </div>
-        <div class="card-actions">
-          <el-button
-              type="danger"
-              size="small"
-              :icon="Delete"
-              circle
+
+        <!-- 标题 -->
+        <h3 class="card-title">{{ note.title }}</h3>
+
+        <!-- 摘要 -->
+        <p class="card-summary">{{ note.summary || '暂无摘要' }}</p>
+
+        <!-- 底部 -->
+        <div class="card-footer">
+          <span class="card-time">{{ formatTime(note.updatedAt) }}</span>
+          <button
+              class="delete-btn"
               @click.stop="softDelete(note.id)"
-          />
+              title="移入回收站"
+          >
+            <el-icon><Delete /></el-icon>
+          </button>
         </div>
-      </el-card>
+      </div>
     </div>
 
-    <el-pagination
-        v-if="total > 0"
-        v-model:current-page="pageNum"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next"
-        @current-change="loadNotes"
-    />
+    <!-- 分页 -->
+    <div class="pagination-wrap" v-if="total > pageSize">
+      <el-pagination
+          v-model:current-page="pageNum"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="loadNotes"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated} from 'vue'
-import { useRouter, useRoute, onBeforeRouteUpdate} from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { Plus, Delete, Search } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
-import TagFilter from '@/components/TagFilter.vue'//day05新增
-import { Delete } from '@element-plus/icons-vue'//day05新增笔记删除方法
-import { ElMessage, ElMessageBox } from 'element-plus'//day05总修改导入
+import TagFilter from '@/components/TagFilter.vue'
 
 const router = useRouter()
 const route = useRoute()
+
 const notes = ref([])
 const loading = ref(false)
 const pageNum = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const selectedTags = ref([])//day05新增
+const selectedTags = ref([])
 const tagMatch = ref('ANY')
 const allTags = ref([])
-const keyword=ref('')
+const keyword = ref('')
 
-// const loadNotes = async () => {
-//   loading.value = true
-//   try {
-//     const res = await request.get('/note/page', {
-//       params: {
-//         pageNum: pageNum.value,
-//         pageSize: pageSize.value
-//       }
-//     })
-//     notes.value = res.data.records
-//     total.value = res.data.total
-//   } finally {
-//     loading.value = false
-//   }
-// }
-// 修改 loadNotes 方法
+// 根据标签给卡片赋予不同的左边框色调，循环用
+const accentColors = ['accent-purple', 'accent-teal', 'accent-amber', 'accent-coral', 'accent-blue']
+const getCardAccent = (note) => {
+  if (!note.tags || note.tags.length === 0) return ''
+  // 用 note.id 取模，保证同一张卡片颜色稳定
+  return accentColors[note.id % accentColors.length]
+}
+
 const loadNotes = async () => {
   loading.value = true
   try {
@@ -3283,18 +5232,14 @@ const loadNotes = async () => {
       pageNum: pageNum.value,
       pageSize: pageSize.value
     }
-
     if (selectedTags.value.length > 0) {
       params.tags = selectedTags.value
       params.tagMatch = tagMatch.value
     }
-
     if (keyword.value) {
       params.keyword = keyword.value
     }
-
     const res = await request.get('/note/page', { params })
-
     notes.value = res.records
     total.value = res.total
   } finally {
@@ -3302,25 +5247,20 @@ const loadNotes = async () => {
   }
 }
 
-const createNote = () => {
-  router.push('/note/new')
-}
-
-const editNote = (id) => {
-  router.push(`/note/${id}`)
-}
+const createNote = () => router.push('/note/new')
+const editNote = (id) => router.push(`/note/${id}`)
 
 const formatTime = (time) => {
   if (!time) return ''
-  return new Date(time).toLocaleString('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const d = new Date(time)
+  const now = new Date()
+  const diff = now - d
+  if (diff < 60 * 1000) return '刚刚'
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-// 加载所有标签（用于筛选下拉）
 const loadAllTags = async () => {
   try {
     const res = await request.get('/note/tags')
@@ -3330,33 +5270,15 @@ const loadAllTags = async () => {
   }
 }
 
-// 处理标签筛选
 const handleTagFilter = () => {
   pageNum.value = 1
   loadNotes()
 }
 
-// 方案 A：使用 onActivated（缓存组件时的最佳实践）
-// ✅ 当从其他路由返回到这个组件时调用
-onActivated(() => {
-  // 检查 query 参数是否需要刷新
-  if (route.query.refresh) {
-    loadNotes()
-  }
-})
-
-onMounted(()=>{
-  loadNotes()
-  loadAllTags()
-})
-
-//添加笔记删除方法
 const softDelete = async (id) => {
   try {
-    await ElMessageBox.confirm('确定将笔记移入回收站吗？', '提示', {
-      type: 'warning'
-    })
-    await request.delete(`/note/${id}`)  // 默认软删除
+    await ElMessageBox.confirm('确定将笔记移入回收站吗？', '提示', { type: 'warning' })
+    await request.delete(`/note/${id}`)
     ElMessage.success('已移入回收站')
     loadNotes()
   } catch (error) {
@@ -3366,83 +5288,381 @@ const softDelete = async (id) => {
   }
 }
 
+onMounted(() => {
+  loadNotes()
+  loadAllTags()
+})
 </script>
 
 <style scoped>
 .note-list {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 4px 0;
 }
 
-.header {
+/* ===== 顶部工具栏 ===== */
+.toolbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.list {
-  display: grid;
-  gap: 15px;
+.toolbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.note-card {
-  cursor: pointer;
-  transition: transform 0.2s;
-  position: relative;
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+  letter-spacing: -0.3px;
 }
 
-.card-content {
-  padding-right: 40px;  /* 为删除按钮留出空间 */
+.note-count {
+  font-size: 13px;
+  color: #9896b0;
+  font-weight: 400;
 }
 
-.note-card:hover {
-  transform: translateY(-2px);
-}
-
-.card-actions {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.note-card:hover .card-actions {
-  opacity: 1;
-}
-
-.title {
-  margin: 0 0 10px 0;
-  color: #303133;
-}
-
-.summary {
-  color: #606266;
-  font-size: 14px;
-  margin-bottom: 10px;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.meta {
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.tag {
-  margin-right: 5px;
+/* 搜索框 */
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #e8e6f0;
+  border-radius: 9px;
+  padding: 6px 12px;
+  transition: border-color 0.2s;
 }
 
-.time {
-  color: #909399;
+.search-wrapper:focus-within {
+  border-color: #6b5ce7;
+  box-shadow: 0 0 0 3px rgba(107, 92, 231, 0.08);
+}
+
+.search-icon {
+  font-size: 14px;
+  color: #b0aec8;
+  flex-shrink: 0;
+}
+
+.search-input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #1a1a2e;
+  background: transparent;
+  width: 180px;
+}
+
+.search-input::placeholder {
+  color: #c0bdd4;
+}
+
+/* 新建按钮 */
+.new-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #5a50d8 0%, #7b6ef0 100%);
+  color: white;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.new-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.new-btn:active {
+  transform: translateY(0);
+}
+
+/* ===== 统计行 ===== */
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: white;
+  border: 1px solid #f0eef8;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1;
+}
+
+.stat-label {
   font-size: 12px;
-  margin-left: auto;
+  color: #9896b0;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 28px;
+  background: #f0eef8;
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+}
+
+.empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: #4a4a6a;
+  margin: 0 0 8px 0;
+}
+
+.empty-sub {
+  font-size: 14px;
+  color: #9896b0;
+  margin: 0 0 24px 0;
+}
+
+.empty-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #5a50d8 0%, #7b6ef0 100%);
+  color: white;
+  border: none;
+  border-radius: 9px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.empty-btn:hover { opacity: 0.9; }
+
+/* ===== 骨架屏 ===== */
+.skeleton-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #f0eef8;
+  padding: 18px;
+}
+
+.skeleton-tag,
+.skeleton-title,
+.skeleton-line {
+  background: #f0eef8;
+  border-radius: 4px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-tag { width: 60px; height: 20px; border-radius: 20px; margin-bottom: 12px; }
+.skeleton-title { width: 75%; height: 18px; margin-bottom: 10px; }
+.skeleton-line { width: 100%; height: 13px; margin-bottom: 7px; }
+.skeleton-line.short { width: 60%; }
+
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== 笔记网格 ===== */
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+  .note-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .note-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== 笔记卡片 ===== */
+.note-card {
+  background: white;
+  border: 1px solid #f0eef8;
+  border-radius: 14px;
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-left: 3px solid #e8e6f0;
+}
+
+.note-card:hover {
+  border-color: #dddaf4;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(107, 92, 231, 0.08);
+}
+
+.note-card:hover .delete-btn {
+  opacity: 1;
+}
+
+/* 左边框色调 */
+.accent-purple { border-left-color: #6b5ce7; }
+.accent-teal   { border-left-color: #1D9E75; }
+.accent-amber  { border-left-color: #BA7517; }
+.accent-coral  { border-left-color: #D85A30; }
+.accent-blue   { border-left-color: #378ADD; }
+
+/* 标签 */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.tag-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #f0eef8;
+  color: #6b5ce7;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.tag-more {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #f5f5f5;
+  color: #9896b0;
+}
+
+/* 标题 */
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+  /* 超出2行截断 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 摘要 */
+.card-summary {
+  font-size: 13px;
+  color: #7c7a96;
+  line-height: 1.65;
+  margin: 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 卡片底部 */
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f5f4fb;
+}
+
+.card-time {
+  font-size: 11px;
+  color: #b0aec8;
+}
+
+.delete-btn {
+  opacity: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #fff0f0;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #d85a5a;
+  transition: opacity 0.2s, background 0.15s;
+  font-size: 13px;
+}
+
+.delete-btn:hover {
+  background: #ffe4e4;
+}
+
+/* ===== 分页 ===== */
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+}
+
+/* 覆盖 Element Plus 分页样式 */
+.pagination-wrap :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: #6b5ce7;
+}
+
+.pagination-wrap :deep(.el-pagination.is-background .el-pager li:hover) {
+  color: #6b5ce7;
 }
 </style>
 ````
@@ -3574,89 +5794,6 @@ const handleRegister = async () => {
 </style>
 ````
 
-## File: note-ui/tsconfig.json
-````json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
-  },
-  "include": ["src"]
-}
-````
-
-## File: note-ui/vite.config.js
-````javascript
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import path from 'path'
-
-export default defineConfig({
-    plugins: [vue()],
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, './src')
-        }
-    },
-    server: {
-        port: 5173,
-        open: true
-    }
-})
-````
-
-## File: README.md
-````markdown
-# Note-lite
-````
-
-## File: note-service/src/main/java/com/note/service/config/SwaggerConfig.java
-````java
-package com.note.service.config;
-
-//day02
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.info.Contact;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class SwaggerConfig {  // 类名可以不改，或改为 Knife4jConfig
-
-    @Bean
-    public OpenAPI openAPI() {
-        return new OpenAPI()
-                .info(new Info()
-                        .title("Note Service API")
-                        .version("1.0")
-                        .description("笔记服务接口文档")
-                        .contact(new Contact()
-                                .name("作者")
-                                .email("your.email@example.com")));
-    }
-}
-````
-
 ## File: note-service/src/main/java/com/note/service/controller/UserController.java
 ````java
 //day02
@@ -3770,143 +5907,35 @@ public class UserRegisterDTO {
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/entity/UserEntity.java
-````java
-//day02
-package com.note.service.entity;
+## File: note-service/src/main/resources/application.yml
+````yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/note_db?createDatabaseIfNotExist=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Data;
-import java.time.LocalDateTime;
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password:      # 无密码留空
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 100ms
 
-@Data
-@TableName("user")
-public class UserEntity {
-    private Long id;
-    private String username;
-    private String password;
-    private String email;
-    private String avatarUrl;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-}
-````
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
 
-## File: note-service/src/main/java/com/note/service/mapper/UserMapper.java
-````java
-//day02
-package com.note.service.mapper;
-
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.note.service.entity.UserEntity;
-import org.apache.ibatis.annotations.Mapper;
-@Mapper
-public interface UserMapper extends BaseMapper<UserEntity> {
-}
-````
-
-## File: note-service/src/main/java/com/note/service/service/UserService.java
-````java
-//day02
-//package com.note.service.service;
-//
-//import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-//import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-//import com.note.service.dto.UserRegisterDTO;
-//import com.note.service.entity.UserEntity;
-//import com.note.service.mapper.UserMapper;
-//import org.springframework.stereotype.Service;
-//@Service
-//public class UserService extends ServiceImpl<UserMapper, UserEntity> {
-//
-//    public boolean register(UserRegisterDTO dto) {
-//        // 1. 判重
-//        boolean exist = baseMapper.selectCount(
-//                new QueryWrapper<UserEntity>()
-//                        .eq("username", dto.getUsername())
-//                        .or()
-//                        .eq("email", dto.getEmail())
-//        ) > 0;
-//        if (exist) return false;
-//
-//        // 2. 保存（密码先明文，Day3 再加密）
-//        UserEntity user = new UserEntity();
-//        user.setUsername(dto.getUsername());
-//        user.setPassword(dto.getPassword());
-//        user.setEmail(dto.getEmail());
-//        return save(user);
-//    }
-//}
-
-//day03-登录
-package com.note.service.service;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.note.service.common.exception.BusinessException;
-import com.note.service.dto.LoginDTO;
-import com.note.service.dto.UserRegisterDTO;
-import com.note.service.entity.UserEntity;
-import com.note.service.mapper.UserMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-
-@Service
-public class UserService extends ServiceImpl<UserMapper, UserEntity> {
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    public void register(UserRegisterDTO dto) {
-        // 检查用户名
-        if (lambdaQuery().eq(UserEntity::getUsername, dto.getUsername()).count() > 0) {
-            throw new BusinessException(400, "用户名已存在");
-        }
-
-        // 检查邮箱
-        if (lambdaQuery().eq(UserEntity::getEmail, dto.getEmail()).count() > 0) {
-            throw new BusinessException(400, "邮箱已被注册");
-        }
-
-        // 创建用户（密码加密）
-        UserEntity user = new UserEntity();
-        user.setUsername(dto.getUsername());
-        user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        user.setEmail(dto.getEmail());
-
-        save(user);
-    }
-
-    public UserEntity login(LoginDTO dto) {
-        UserEntity user = lambdaQuery()
-                .eq(UserEntity::getUsername, dto.getUsername())
-                .one();
-
-        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-            throw new BusinessException(400, "用户名或密码错误");
-        }
-
-        return user;
-    }
-}
-````
-
-## File: note-ui/index.html
-````html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>note-ui</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
+jwt:
+  secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
+  expiration: 86400000  # 24小时，单位毫秒
 ````
 
 ## File: note-ui/package.json
@@ -3938,37 +5967,6 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
     "vue-router": "^4.6.4"
   }
 }
-````
-
-## File: note-service/src/main/resources/application.yml
-````yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/note_db?createDatabaseIfNotExist=true&serverTimezone=Asia/Shanghai
-    username: root
-    password: 1234
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      # password:      # 无密码留空
-      database: 0
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: 100ms
-
-mybatis-plus:
-  configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
-
-jwt:
-  secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
-  expiration: 86400000  # 24小时，单位毫秒
 ````
 
 ## File: note-service/pom.xml

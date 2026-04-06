@@ -22,12 +22,22 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.ArrayList;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
     private final NoteTagMapper noteTagMapper;
+
+    private final StringRedisTemplate stringRedisTemplate;  // 通过构造器注入
+    private static final String CACHE_NOTE_PREFIX = "note:detail:";
+    private static final long CACHE_TTL_HOURS = 1;
+    private final ObjectMapper objectMapper;
 
     // ========== 核心 CRUD ==========
 
@@ -53,6 +63,33 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
     }
 
     public NoteEntity getDetail(Long noteId, Long userId) {
+
+        // 1.首先尝试从缓存中获取
+        String cacheKey = CACHE_NOTE_PREFIX + noteId;
+        String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
+        if (cachedJson != null) {
+            log.info("缓存命中: noteId={}", noteId);
+            try {
+                // 反序列化 JSON 为 NoteEntity（注意：需要处理 tags 字段）
+                NoteEntity note = objectMapper.readValue(cachedJson, NoteEntity.class);
+                // 校验权限（缓存中不包含 userId 校验，需要额外检查）
+                if (!note.getUserId().equals(userId)) {
+                    throw new BusinessException(403, "无权访问");
+                }
+                if (note.getIsDeleted() == 1) {
+                    throw new BusinessException(404, "笔记已在回收站");
+                }
+                return note;
+            } catch (JsonProcessingException e) {
+                log.error("缓存反序列化失败: noteId={}", noteId, e);
+                // 解析失败，删除缓存并继续查数据库
+                stringRedisTemplate.delete(cacheKey);
+            }
+        } else {
+            log.info("缓存未命中: noteId={}", noteId);
+        }
+
+        // 2.缓存未命中，查数据库
         NoteEntity note = baseMapper.selectById(noteId);
         if (note == null || !note.getUserId().equals(userId)) {
             throw new BusinessException(404, "笔记不存在或无权限");
@@ -65,7 +102,16 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
         note.setTags(tags);
 
+        // 3.写入缓存（异步或者同步，这里写同步）day07
+
         return note;
+    }
+
+    //新增清除缓存的方法
+    private void clearNoteCache(Long noteId) {
+        String cacheKey = CACHE_NOTE_PREFIX + noteId;
+        Boolean deleted = stringRedisTemplate.delete(cacheKey);
+        log.debug("清除缓存: key={}, existed={}", cacheKey, deleted);
     }
 
     @Transactional
@@ -85,7 +131,9 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             saveTags(noteId, dto.getTags());
         }
 
-        log.info("更新笔记成功: noteId={}", noteId);
+        // 清除缓存
+        clearNoteCache(noteId);
+        log.info("更新笔记成功，已清除缓存: noteId={}", noteId);
     }
 
     @Transactional
@@ -107,6 +155,8 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             baseMapper.updateById(note);
             log.info("移入回收站: noteId={}", noteId);
         }
+        // 新增无论是软删除还是物理删除都需要清除缓存
+        clearNoteCache(noteId);
     }
 
     // ========== 分页查询 ==========
@@ -272,7 +322,8 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         note.setIsDeleted(0);
         note.setDeletedAt(null);
         baseMapper.updateById(note);
-        log.info("恢复笔记: noteId={}", noteId);
+        clearNoteCache(noteId);
+        log.info("恢复笔记，已清除缓存: noteId={}", noteId);
     }
 
     /**
@@ -322,6 +373,29 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
      * 获取笔记详情（无需权限，用于分享）
      */
     public NoteEntity getDetailWithoutAuth(Long noteId) {
+
+        String cacheKey = CACHE_NOTE_PREFIX + noteId;
+        String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedJson != null) {
+            log.info("分享-缓存命中: noteId={}", noteId);
+            try {
+                NoteEntity note = objectMapper.readValue(cachedJson, NoteEntity.class);
+                // 分享访问只需校验笔记未被删除
+                if (note.getIsDeleted() == 1) {
+                    throw new BusinessException(404, "笔记不存在或已删除");
+                }
+                return note;
+            } catch (JsonProcessingException e) {
+                log.error("分享-缓存反序列化失败，将删除缓存 key={}", cacheKey, e);
+                stringRedisTemplate.delete(cacheKey);
+                // 继续查库
+            }
+        } else {
+            log.info("分享-缓存未命中: noteId={}", noteId);
+        }
+
+        // 缓存未命中或反序列化失败，查询数据库
         NoteEntity note = baseMapper.selectById(noteId);
         if (note == null || note.getIsDeleted() == 1) {
             throw new BusinessException(404, "笔记不存在或已删除");
@@ -329,6 +403,15 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         // 组装标签
         List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
         note.setTags(tags);
+
+        // 写入缓存
+        try {
+            String json = objectMapper.writeValueAsString(note);
+            stringRedisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL_HOURS, TimeUnit.HOURS);
+            log.debug("分享-缓存写入: noteId={}", noteId);
+        } catch (JsonProcessingException e) {
+            log.error("分享-序列化笔记失败，noteId={}", noteId, e);
+        }
         return note;
     }
 

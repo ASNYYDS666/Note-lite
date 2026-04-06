@@ -51,19 +51,25 @@ note-service/src/main/java/com/note/service/common/util/JwtUtils.java
 note-service/src/main/java/com/note/service/common/vo/Result.java
 note-service/src/main/java/com/note/service/config/SwaggerConfig.java
 note-service/src/main/java/com/note/service/controller/NoteController.java
+note-service/src/main/java/com/note/service/controller/ShareController.java
 note-service/src/main/java/com/note/service/controller/UserController.java
 note-service/src/main/java/com/note/service/dto/LoginDTO.java
 note-service/src/main/java/com/note/service/dto/NoteDTO.java
 note-service/src/main/java/com/note/service/dto/NoteQueryDTO.java
+note-service/src/main/java/com/note/service/dto/ShareAccessDTO.java
+note-service/src/main/java/com/note/service/dto/ShareCreateDTO.java
 note-service/src/main/java/com/note/service/dto/UserRegisterDTO.java
 note-service/src/main/java/com/note/service/entity/NoteEntity.java
 note-service/src/main/java/com/note/service/entity/NoteTagEntity.java
+note-service/src/main/java/com/note/service/entity/ShareEntity.java
 note-service/src/main/java/com/note/service/entity/UserEntity.java
 note-service/src/main/java/com/note/service/mapper/NoteMapper.java
 note-service/src/main/java/com/note/service/mapper/NoteTagMapper.java
+note-service/src/main/java/com/note/service/mapper/ShareMapper.java
 note-service/src/main/java/com/note/service/mapper/UserMapper.java
 note-service/src/main/java/com/note/service/NoteServiceApplication.java
 note-service/src/main/java/com/note/service/service/NoteService.java
+note-service/src/main/java/com/note/service/service/ShareService.java
 note-service/src/main/java/com/note/service/service/UserService.java
 note-service/src/main/resources/application.yml
 note-service/src/main/resources/db/migration/V2__create_note_and_tag.sql
@@ -88,6 +94,7 @@ note-ui/src/views/NoteEdit.vue
 note-ui/src/views/NoteList.vue
 note-ui/src/views/RecycleBin.vue
 note-ui/src/views/Register.vue
+note-ui/src/views/ShareView.vue
 note-ui/tsconfig.json
 note-ui/vite.config.js
 package.json
@@ -978,6 +985,48 @@ public class Result<T> {
 }
 ````
 
+## File: note-service/src/main/java/com/note/service/controller/ShareController.java
+````java
+package com.note.service.controller;
+
+import com.note.service.common.vo.Result;
+import com.note.service.dto.ShareAccessDTO;
+import com.note.service.dto.ShareCreateDTO;
+import com.note.service.service.ShareService;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/share")
+@RequiredArgsConstructor
+public class ShareController {
+    private final ShareService shareService;
+
+    @PostMapping
+    @Operation(summary = "生成分享码")
+    public Result<Map<String, String>> createShare(@RequestBody @Valid ShareCreateDTO dto,
+                                                   @AuthenticationPrincipal Long userId) {
+        String code = shareService.generateShareCode(dto, userId);
+        Map<String, String> result = new HashMap<>();
+        result.put("code", code);
+        return Result.success(result);
+    }
+
+    @GetMapping("/{code}")
+    @Operation(summary = "通过分享码访问笔记（无需登录）")
+    public Result<ShareAccessDTO> accessByCode(@PathVariable String code) {
+        ShareAccessDTO access = shareService.accessByCode(code);
+        return Result.success(access);
+    }
+}
+````
+
 ## File: note-service/src/main/java/com/note/service/dto/LoginDTO.java
 ````java
 //day03
@@ -1021,6 +1070,38 @@ public class NoteDTO {
 }
 ````
 
+## File: note-service/src/main/java/com/note/service/dto/ShareAccessDTO.java
+````java
+package com.note.service.dto;
+
+//通过分享码访问返回
+import com.note.service.entity.NoteEntity;
+import lombok.Data;
+
+@Data
+public class ShareAccessDTO {
+    private NoteEntity note;
+    private String permission;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/dto/ShareCreateDTO.java
+````java
+package com.note.service.dto;
+
+//生成分享码请求
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class ShareCreateDTO {
+    @NotNull(message = "笔记ID不能为空")
+    private Long noteId;
+
+    private String permission = "READ"; // 默认可读 (保留接口write)
+}
+````
+
 ## File: note-service/src/main/java/com/note/service/entity/NoteTagEntity.java
 ````java
 package com.note.service.entity;
@@ -1042,6 +1123,42 @@ public class NoteTagEntity {
 }
 ````
 
+## File: note-service/src/main/java/com/note/service/entity/ShareEntity.java
+````java
+package com.note.service.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("share")
+public class ShareEntity {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private Long noteId;
+    private String code;
+    private String permission; // READ / WRITE
+    private LocalDateTime expireAt;
+    private LocalDateTime createdAt;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/mapper/ShareMapper.java
+````java
+package com.note.service.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.note.service.entity.ShareEntity;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface ShareMapper extends BaseMapper<ShareEntity>{
+
+}
+````
+
 ## File: note-service/src/main/java/com/note/service/NoteServiceApplication.java
 ````java
 package com.note.service;
@@ -1056,6 +1173,148 @@ public class NoteServiceApplication {
 		SpringApplication.run(NoteServiceApplication.class, args);
 	}
 
+}
+````
+
+## File: note-service/src/main/java/com/note/service/service/ShareService.java
+````java
+package com.note.service.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.note.service.common.exception.BusinessException;
+import com.note.service.dto.ShareAccessDTO;
+import com.note.service.dto.ShareCreateDTO;
+import com.note.service.entity.NoteEntity;
+import com.note.service.entity.ShareEntity;
+import com.note.service.mapper.ShareMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ShareService {
+    private final ShareMapper shareMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final NoteService noteService;
+
+    private static final String SHARE_REDIS_PREFIX = "share:";
+    private static final int CODE_LENGTH = 8;
+    private static final int EXPIRE_DAYS = 7; // 分享码有效期7天
+
+    /**
+     * 生成分享码（原子操作，无冲突）
+     */
+    @Transactional
+    public String generateShareCode(ShareCreateDTO dto, Long userId) {
+        // 校验笔记是否存在且属于当前用户
+        NoteEntity note = noteService.getDetail(dto.getNoteId(), userId);
+        if (note == null) {
+            throw new BusinessException(404, "笔记不存在");
+        }
+
+        // 调用 Lua 脚本生成唯一分享码
+        String shareCode = generateUniqueCode();
+
+        // 保存到数据库
+        ShareEntity share = new ShareEntity();
+        share.setNoteId(dto.getNoteId());
+        share.setCode(shareCode);
+        share.setPermission(dto.getPermission());
+        share.setExpireAt(LocalDateTime.now().plusDays(EXPIRE_DAYS));
+        shareMapper.insert(share);
+
+        // 写入 Redis（用于快速校验）
+        String redisKey = SHARE_REDIS_PREFIX + shareCode;
+        String value = share.getNoteId() + ":" + share.getPermission();
+        stringRedisTemplate.opsForValue().set(redisKey, value, EXPIRE_DAYS, TimeUnit.DAYS);
+
+        log.info("生成分享码: noteId={}, code={}", note.getId(), shareCode);
+        return shareCode;
+    }
+
+    /**
+     * 通过分享码获取笔记内容（无需登录）
+     */
+    public ShareAccessDTO accessByCode(String code) {
+        // 1. 从 Redis 获取
+        String redisKey = SHARE_REDIS_PREFIX + code;
+        String cached = stringRedisTemplate.opsForValue().get(redisKey);
+        if (cached != null) {
+            String[] parts = cached.split(":");
+            Long noteId = Long.parseLong(parts[0]);
+            String permission = parts[1];
+            NoteEntity note = noteService.getDetailWithoutAuth(noteId); // 新方法，不校验用户
+            return buildAccessDTO(note, permission);
+        }
+
+        // 2. Redis 未命中，查数据库
+        LambdaQueryWrapper<ShareEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ShareEntity::getCode, code)
+                .ge(ShareEntity::getExpireAt, LocalDateTime.now());
+        ShareEntity share = shareMapper.selectOne(wrapper);
+        if (share == null) {
+            throw new BusinessException(404, "分享码不存在或已过期");
+        }
+
+        NoteEntity note = noteService.getDetailWithoutAuth(share.getNoteId());
+        // 回写 Redis
+        String value = share.getNoteId() + ":" + share.getPermission();
+        stringRedisTemplate.opsForValue().set(redisKey, value, EXPIRE_DAYS, TimeUnit.DAYS);
+
+        return buildAccessDTO(note, share.getPermission());
+    }
+
+    private ShareAccessDTO buildAccessDTO(NoteEntity note, String permission) {
+        ShareAccessDTO dto = new ShareAccessDTO();
+        dto.setNote(note);
+        dto.setPermission(permission);
+        return dto;
+    }
+
+    /**
+     * 生成唯一分享码（通过 Lua 脚本保证原子性）
+     */
+    private String generateUniqueCode() {
+        // Lua 脚本：在 Redis 中尝试生成一个不存在的分享码，最多重试 10 次
+        String luaScript =
+                "local key_prefix = ARGV[1] " +
+                        "local code_length = tonumber(ARGV[2]) " +
+                        "local max_attempts = tonumber(ARGV[3]) " +
+                        "for i = 1, max_attempts do " +
+                        "   local code = '' " +
+                        "   for j = 1, code_length do " +
+                        "       local rand = math.random(48, 122) " +
+                        "       if rand > 57 and rand < 65 then rand = 65 end " +
+                        "       if rand > 90 and rand < 97 then rand = 97 end " +
+                        "       code = code .. string.char(rand) " +
+                        "   end " +
+                        "   local exists = redis.call('EXISTS', key_prefix .. code) " +
+                        "   if exists == 0 then " +
+                        "       redis.call('SETEX', key_prefix .. code, 86400 * 7, 'temp') " +
+                        "       return code " +
+                        "   end " +
+                        "end " +
+                        "return nil";
+
+        DefaultRedisScript<String> script = new DefaultRedisScript<>(luaScript, String.class);
+        String code = stringRedisTemplate.execute(script, Collections.emptyList(),
+                SHARE_REDIS_PREFIX, String.valueOf(CODE_LENGTH), "10");
+        if (code == null) {
+            throw new BusinessException(500, "生成分享码失败，请重试");
+        }
+        return code;
+    }
 }
 ````
 
@@ -1512,6 +1771,1118 @@ button:focus-visible {
 ## File: note-ui/src/typescript.svg
 ````xml
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="32" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="#007ACC" d="M0 128v128h256V0H0z"></path><path fill="#FFF" d="m56.612 128.85l-.081 10.483h33.32v94.68h23.568v-94.68h33.321v-10.28c0-5.69-.122-10.444-.284-10.566c-.122-.162-20.4-.244-44.983-.203l-44.74.122l-.121 10.443Zm149.955-10.742c6.501 1.625 11.459 4.51 16.01 9.224c2.357 2.52 5.851 7.111 6.136 8.208c.08.325-11.053 7.802-17.798 11.988c-.244.162-1.22-.894-2.317-2.52c-3.291-4.795-6.745-6.867-12.028-7.233c-7.76-.528-12.759 3.535-12.718 10.321c0 1.992.284 3.17 1.097 4.795c1.707 3.536 4.876 5.649 14.832 9.956c18.326 7.883 26.168 13.084 31.045 20.48c5.445 8.249 6.664 21.415 2.966 31.208c-4.063 10.646-14.14 17.879-28.323 20.276c-4.388.772-14.79.65-19.504-.203c-10.28-1.828-20.033-6.908-26.047-13.572c-2.357-2.6-6.949-9.387-6.664-9.874c.122-.163 1.178-.813 2.356-1.504c1.138-.65 5.446-3.129 9.509-5.485l7.355-4.267l1.544 2.276c2.154 3.29 6.867 7.801 9.712 9.305c8.167 4.307 19.383 3.698 24.909-1.26c2.357-2.153 3.332-4.388 3.332-7.68c0-2.966-.366-4.266-1.91-6.501c-1.99-2.845-6.054-5.242-17.595-10.24c-13.206-5.69-18.895-9.224-24.096-14.832c-3.007-3.25-5.852-8.452-7.03-12.8c-.975-3.617-1.22-12.678-.447-16.335c2.723-12.76 12.353-21.659 26.25-24.3c4.51-.853 14.994-.528 19.424.569Z"></path></svg>
+````
+
+## File: note-ui/src/views/ShareView.vue
+````vue
+<!--<template>-->
+<!--  <div class="share-view">-->
+<!--    <div v-if="loading" class="loading">加载中...</div>-->
+<!--    <div v-else-if="note">-->
+<!--      <h1>{{ note.title }}</h1>-->
+<!--      <div class="markdown-body" v-html="renderedHtml"></div>-->
+<!--    </div>-->
+<!--    <div v-else>分享码无效或已过期</div>-->
+<!--  </div>-->
+<!--</template>-->
+
+<!--<script setup>-->
+<!--import { ref, onMounted, computed } from 'vue'-->
+<!--import { useRoute } from 'vue-router'-->
+<!--import { marked } from 'marked'-->
+<!--import request from '@/utils/request'-->
+
+<!--const route = useRoute()-->
+<!--const loading = ref(true)-->
+<!--const note = ref(null)-->
+<!--const permission = ref('READ')-->
+
+<!--const renderedHtml = computed(() => {-->
+<!--  if (!note.value) return ''-->
+<!--  return marked.parse(note.value.content || '')-->
+<!--})-->
+
+<!--onMounted(async () => {-->
+<!--  const code = route.params.code-->
+<!--  try {-->
+<!--    const res = await request.get(`/share/${code}`)-->
+<!--    note.value = res.note-->
+<!--    permission.value = res.permission-->
+<!--  } catch (error) {-->
+<!--    console.error('访问分享失败', error)-->
+<!--  } finally {-->
+<!--    loading.value = false-->
+<!--  }-->
+<!--})-->
+<!--</script>-->
+
+<!--<style scoped>-->
+<!--.share-view {-->
+<!--  max-width: 800px;-->
+<!--  margin: 0 auto;-->
+<!--  padding: 20px;-->
+<!--}-->
+<!--</style>-->
+
+<template>
+  <div class="share-view">
+    <div v-if="loading" class="loading-container">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <span>加载中...</span>
+    </div>
+    <div v-else-if="error" class="error-container">
+      <el-icon><WarningFilled /></el-icon>
+      <p>{{ error }}</p>
+    </div>
+    <div v-else class="content-container">
+      <h1 class="share-title">{{ note.title }}</h1>
+      <div class="share-meta" v-if="note.tags && note.tags.length">
+        <el-tag v-for="tag in note.tags" :key="tag" size="small">{{ tag }}</el-tag>
+      </div>
+      <div class="markdown-body" v-html="renderedHtml"></div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
+import { ElMessage } from 'element-plus'
+import { Loading, WarningFilled } from '@element-plus/icons-vue'
+import request from '@/utils/request'
+
+const route = useRoute()
+const loading = ref(true)
+const error = ref('')
+const note = ref(null)
+
+// 配置 marked（与编辑器保持一致）
+marked.setOptions({
+  highlight: (code, lang) => {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value
+    }
+    return hljs.highlightAuto(code).value
+  },
+  breaks: true,
+  gfm: true
+})
+
+const renderedHtml = computed(() => {
+  if (!note.value) return ''
+  return marked.parse(note.value.content || '')
+})
+
+onMounted(async () => {
+  const code = route.params.code
+  if (!code) {
+    error.value = '无效的分享码'
+    loading.value = false
+    return
+  }
+  try {
+    const res = await request.get(`/share/${code}`)
+    note.value = res.note
+  } catch (err) {
+    // 请求拦截器已经处理了错误弹窗，这里只设置本地错误信息用于显示
+    error.value = err.message || '分享内容不存在或已过期'
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
+<style scoped>
+.share-view {
+  min-height: 100vh;
+  background: #f8f7f4;
+  padding: 40px 20px;
+}
+
+.loading-container,
+.error-container {
+  text-align: center;
+  margin-top: 100px;
+  color: #7c7a96;
+}
+
+.loading-container .el-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.error-container .el-icon {
+  font-size: 48px;
+  color: #f56c6c;
+  margin-bottom: 16px;
+}
+
+.content-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  padding: 32px 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.share-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.3px;
+}
+
+.share-meta {
+  margin-bottom: 24px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #f0eef8;
+  padding-bottom: 16px;
+}
+
+/* Markdown 样式与编辑器预览保持一致 */
+.markdown-body :deep(h1) {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+.markdown-body :deep(h2) {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+.markdown-body :deep(pre) {
+  background: #f6f8fa;
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.markdown-body :deep(code) {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 85%;
+}
+.markdown-body :deep(blockquote) {
+  border-left: 4px solid #dfe2e5;
+  padding-left: 16px;
+  color: #6a737d;
+  margin: 0;
+}
+</style>
+````
+
+## File: note-ui/tsconfig.json
+````json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+````
+
+## File: note-ui/vite.config.js
+````javascript
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import path from 'path'
+
+export default defineConfig({
+    plugins: [vue()],
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, './src')
+        }
+    },
+    server: {
+        port: 5173,
+        open: true
+    }
+})
+````
+
+## File: package.json
+````json
+{
+  "dependencies": {
+    "lodash-es": "^4.17.23"
+  }
+}
+````
+
+## File: README.md
+````markdown
+# Note-lite
+````
+
+## File: note-service/src/main/java/com/note/service/common/config/RedisConfig.java
+````java
+package com.note.service.common.config;
+
+//import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+//import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+//@Configuration
+//public class RedisConfig {
+//
+//    @Bean
+//    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+//        RedisTemplate<String, Object> template = new RedisTemplate<>();
+//        template.setConnectionFactory(factory);
+//
+//        // Key 用 String 序列化
+//        template.setKeySerializer(new StringRedisSerializer());
+//        template.setHashKeySerializer(new StringRedisSerializer());
+//
+//        // Value 用 JSON 序列化（带类型信息，便于反序列化）
+//        ObjectMapper mapper = new ObjectMapper();
+//        mapper.activateDefaultTyping(
+//                LaissezFaireSubTypeValidator.instance,
+//                ObjectMapper.DefaultTyping.NON_FINAL
+//        );
+//        GenericJackson2JsonRedisSerializer serializer =
+//                new GenericJackson2JsonRedisSerializer(mapper);
+//
+//        template.setValueSerializer(serializer);
+//        template.setHashValueSerializer(serializer);
+//        template.afterPropertiesSet();
+//
+//        return template;
+//    }
+//}
+@Configuration
+public class RedisConfig {
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(factory);
+
+        // Key 用 String 序列化
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+
+        // Value 只序列化字符串，避免反序列化漏洞
+        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+        template.setValueSerializer(stringRedisSerializer);
+        template.setHashValueSerializer(stringRedisSerializer);
+
+        template.afterPropertiesSet();
+        return template;
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/config/SwaggerConfig.java
+````java
+package com.note.service.config;
+
+//day02
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.Contact;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SwaggerConfig {  // 类名可以不改，或改为 Knife4jConfig
+
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Note Service API")
+                        .version("1.0")
+                        .description("笔记服务接口文档")
+                        .contact(new Contact()
+                                .name("作者")
+                                .email("your.email@example.com")));
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/controller/NoteController.java
+````java
+package com.note.service.controller;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.note.service.common.vo.Result;
+import com.note.service.dto.NoteDTO;
+import com.note.service.dto.NoteQueryDTO;
+import com.note.service.entity.NoteEntity;
+import com.note.service.service.NoteService;
+import com.note.service.mapper.NoteTagMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;  // 如果用 Lombok
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/note")
+@RequiredArgsConstructor
+@Validated
+@Tag(name = "笔记管理", description = "笔记的增删改查与标签管理")
+public class NoteController {
+
+
+    private final NoteService noteService;
+    private final NoteTagMapper noteTagMapper;          // 用于 /tags 接口
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;            // Spring Boot 自动注册，直接注入即可
+
+    @PostMapping
+    @Operation(summary = "创建笔记")
+    public Result<Long> create(@RequestBody @Valid NoteDTO dto,
+                               @AuthenticationPrincipal Long userId) {
+        Long noteId = noteService.createNote(userId, dto);
+        return Result.success(noteId);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "获取笔记详情")
+    public Result<NoteEntity> detail(@PathVariable Long id,
+                                     @AuthenticationPrincipal Long userId) {
+        return Result.success(noteService.getDetail(id, userId));
+    }
+
+
+    @PutMapping("/{id}")
+    @Operation(summary = "更新笔记")
+    public Result<Void> update(@PathVariable Long id,
+                               @RequestBody @Valid NoteDTO dto,
+                               @AuthenticationPrincipal Long userId) {
+        noteService.updateNote(id, userId, dto);
+        return Result.success();
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "删除笔记（默认软删除，permanent=true 物理删除）")
+    public Result<Void> delete(@PathVariable Long id,
+                               @RequestParam(defaultValue = "false") boolean permanent,
+                               @AuthenticationPrincipal Long userId) {
+        noteService.deleteNote(id, userId, permanent);
+        return Result.success();
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "分页查询笔记列表")
+    public Result<Page<NoteEntity>> page(NoteQueryDTO query,
+                                         @AuthenticationPrincipal Long userId) {
+        return Result.success(noteService.pageQuery(userId, query));
+    }
+
+    // ==================== 回收站接口 ====================
+
+    @GetMapping("/recycle/page")
+    @Operation(summary = "获取回收站列表")
+    public Result<Page<NoteEntity>> recyclePage(NoteQueryDTO query,
+                                                @AuthenticationPrincipal Long userId) {
+        query.setIsDeleted(1);
+        return Result.success(noteService.pageRecycle(userId, query));
+    }
+
+    @PutMapping("/{id}/restore")
+    @Operation(summary = "从回收站恢复笔记")
+    public Result<Void> restore(@PathVariable Long id,
+                                @AuthenticationPrincipal Long userId) {
+        noteService.restoreFromRecycle(id, userId);
+        return Result.success();
+    }
+
+    @DeleteMapping("/recycle/clear")
+    @Operation(summary = "清空回收站")
+    public Result<Void> clearRecycle(@AuthenticationPrincipal Long userId) {
+        noteService.clearRecycle(userId);
+        return Result.success();
+    }
+
+    // ==================== 标签接口 ====================
+
+    @GetMapping("/tags")
+    @Operation(summary = "获取当前用户所有标签")
+    public Result<List<String>> getUserTags(@AuthenticationPrincipal Long userId) {
+        List<String> tags = noteTagMapper.selectDistinctTagsByUserId(userId);
+        return Result.success(tags);
+    }
+
+    // ==================== 草稿接口（Jackson 版）====================
+
+    /**
+     * 构建草稿 Redis Key
+     * 新建笔记草稿：note:draft:{userId}:new
+     * 已有笔记草稿：note:draft:{userId}:{noteId}
+     */
+    private String buildDraftKey(Long userId, Long noteId) {
+        if (noteId != null) {
+            return "note:draft:" + userId + ":" + noteId;
+        }
+        // 新建笔记用固定后缀 "new"，避免多 tab 歧义时 key 混乱
+        // 已知限制：同用户同时新建多篇时会覆盖，可接受（面试可讲）
+        return "note:draft:" + userId + ":new";
+    }
+
+    @PostMapping("/draft")
+    @Operation(summary = "自动保存草稿（3秒防抖后前端触发）")
+    public Result<Void> saveDraft(@RequestBody NoteDTO dto,
+                                  @AuthenticationPrincipal Long userId) {
+        String key = buildDraftKey(userId, dto.getId());
+        try {
+            String json = objectMapper.writeValueAsString(dto);
+            stringRedisTemplate.opsForValue().set(key, json, 7, TimeUnit.DAYS);
+            log.debug("草稿已保存: key={}", key);
+        } catch (JsonProcessingException e) {
+            // 序列化失败不影响主流程，只记录日志
+            log.error("草稿序列化失败: userId={}, noteId={}", userId, dto.getId(), e);
+        }
+        return Result.success();
+    }
+
+    @GetMapping("/draft")
+    @Operation(summary = "获取草稿（进入编辑页时查询）")
+    public Result<NoteDTO> getDraft(@RequestParam(required = false) Long noteId,
+                                    @AuthenticationPrincipal Long userId) {
+        String key = buildDraftKey(userId, noteId);
+        String json = stringRedisTemplate.opsForValue().get(key);
+
+        if (json == null) {
+            return Result.success(null);  // 无草稿，返回 null，前端正常处理
+        }
+
+        try {
+            NoteDTO draft = objectMapper.readValue(json, NoteDTO.class);
+            log.debug("草稿已读取: key={}", key);
+            return Result.success(draft);
+        } catch (JsonProcessingException e) {
+            // 草稿数据损坏，删除并返回 null
+            log.error("草稿反序列化失败，已清除: key={}", key, e);
+            stringRedisTemplate.delete(key);
+            return Result.success(null);
+        }
+    }
+
+    @DeleteMapping("/draft")
+    @Operation(summary = "清除草稿（保存成功后前端调用）")
+    public Result<Void> clearDraft(@RequestParam(required = false) Long noteId,
+                                   @AuthenticationPrincipal Long userId) {
+        String key = buildDraftKey(userId, noteId);
+        Boolean deleted = stringRedisTemplate.delete(key);
+        log.debug("草稿已清除: key={}, existed={}", key, deleted);
+        return Result.success();
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/dto/NoteQueryDTO.java
+````java
+package com.note.service.dto;
+
+import lombok.Data;
+//day05-添加标签筛选字段
+import java.util.List;
+
+@Data
+public class NoteQueryDTO {
+    private Integer pageNum = 1;
+    private Integer pageSize = 20;
+    private String keyword;      // 标题搜索（暂不实现内容搜索）
+    private Integer isDeleted = 0;
+    private List<String> tags;  //day05-标签筛选-新增
+    private String tagMatch="ANY";  //ANY-任意标签 ALL-全部标签-新增
+}
+````
+
+## File: note-service/src/main/java/com/note/service/entity/NoteEntity.java
+````java
+package com.note.service.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Arrays;
+import java.util.ArrayList;
+
+@Data
+@TableName("note")
+public class NoteEntity {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private Long userId;
+    private String title;
+    private String content;
+    private String summary;
+
+    @TableField("is_deleted")
+    private Integer isDeleted;
+
+    private LocalDateTime deletedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+
+    // 非数据库字段，用于接收 GROUP_CONCAT 结果
+    @TableField(exist = false)
+    private String tagNames;
+
+    @TableField(exist = false)
+    private List<String> tags;
+
+    // 解析 tagNames 到 tags 列表的方法
+    public void parseTagNames() {
+        if (this.tagNames != null && !this.tagNames.isEmpty()) {
+            this.tags = Arrays.asList(this.tagNames.split(","));
+        } else {
+            this.tags = new ArrayList<>();
+        }
+    }
+}
+````
+
+## File: note-service/src/main/java/com/note/service/entity/UserEntity.java
+````java
+//day02
+package com.note.service.entity;
+
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("user")
+public class UserEntity {
+    private Long id;
+    private String username;
+    private String password;
+    private String email;
+    private String avatarUrl;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+````
+
+## File: note-service/src/main/java/com/note/service/mapper/NoteMapper.java
+````java
+package com.note.service.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.note.service.entity.NoteEntity;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+@Mapper
+public interface NoteMapper extends BaseMapper<NoteEntity> {
+
+    // 分页查询用户的笔记（带标签聚合）
+    // 这个是原有的分页查询方法，在day05步骤二更改为 一下
+//    @Select("SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
+//            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
+//            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
+//            "GROUP BY n.id ORDER BY n.updated_at DESC")
+//    Page<NoteEntity> selectPageWithTags(Page<NoteEntity> page,
+//                                        @Param("userId") Long userId,
+//                                        @Param("isDeleted") Integer isDeleted);
+
+     //查询当前页数据（带标签筛选）- 手动分页
+     //
+    @Select("<script>" +
+            "SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
+            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
+            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
+            "<if test='keyword != null and keyword != \"\"'>" +
+            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
+            "</if>" +
+            "<if test='tags != null and tags.size() > 0'>" +
+            " AND n.id IN (" +
+            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
+            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
+            "   GROUP BY note_id " +
+            "   <if test='tagMatch == \"ALL\"'>" +
+            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
+            "   </if>" +
+            " )" +
+            "</if>" +
+            "GROUP BY n.id " +
+            "ORDER BY n.updated_at DESC " +
+            "LIMIT #{offset}, #{limit}" +
+            "</script>")
+    List<NoteEntity> selectWithTags(@Param("userId") Long userId,
+                                    @Param("isDeleted") Integer isDeleted,
+                                    @Param("keyword") String keyword,
+                                    @Param("tags") List<String> tags,
+                                    @Param("tagMatch") String tagMatch,
+                                    @Param("offset") long offset,
+                                    @Param("limit") long limit);
+
+    /**
+     * 查询总记录数（带标签筛选）- 使用 COUNT DISTINCT 确保准确
+     */
+    @Select("<script>" +
+            "SELECT COUNT(DISTINCT n.id) FROM note n " +
+            "LEFT JOIN note_tag nt ON n.id = nt.note_id " +
+            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
+            "<if test='keyword != null and keyword != \"\"'>" +
+            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
+            "</if>" +
+            "<if test='tags != null and tags.size() > 0'>" +
+            " AND n.id IN (" +
+            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
+            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
+            "   GROUP BY note_id " +
+            "   <if test='tagMatch == \"ALL\"'>" +
+            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
+            "   </if>" +
+            " )" +
+            "</if>" +
+            "</script>")
+    long countWithTags(@Param("userId") Long userId,
+                       @Param("isDeleted") Integer isDeleted,
+                       @Param("keyword") String keyword,
+                       @Param("tags") List<String> tags,
+                       @Param("tagMatch") String tagMatch);
+
+}
+````
+
+## File: note-service/src/main/java/com/note/service/mapper/NoteTagMapper.java
+````java
+package com.note.service.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.note.service.entity.NoteTagEntity;
+import com.note.service.entity.NoteEntity;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+import java.util.List;
+
+@Mapper
+public interface NoteTagMapper extends BaseMapper<NoteTagEntity> {
+
+
+    @Select("SELECT tag_name FROM note_tag WHERE note_id = #{noteId}")
+    List<String> selectTagsByNoteId(@Param("noteId") Long noteId);
+    // 根据用户ID查询所有不重复的标签（Day 5 步骤 14 需要的）- 这个可能没添加
+    @Select("SELECT DISTINCT tag_name FROM note_tag WHERE note_id IN " +
+            "(SELECT id FROM note WHERE user_id = #{userId})")
+    List<String> selectDistinctTagsByUserId(@Param("userId") Long userId);
+
+    //day05-添加标签筛选的分页查询
+    @Select("<script>" +
+            "SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
+            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
+            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
+            "<if test='keyword != null and keyword != \"\"'>" +
+            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
+            "</if>" +
+            "<if test='tags != null and tags.size() > 0'>" +
+            " AND n.id IN (" +
+            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
+            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
+            "   GROUP BY note_id " +
+            "   <if test='tagMatch == \"ALL\"'>" +
+            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
+            "   </if>" +
+            " )" +
+            "</if>" +
+            "GROUP BY n.id ORDER BY n.updated_at DESC" +
+            "</script>")
+    Page<NoteEntity> selectPageWithTags(@Param("page") Page<NoteEntity> page,
+                                        @Param("userId") Long userId,
+                                        @Param("isDeleted") Integer isDeleted,
+                                        @Param("keyword") String keyword,
+                                        @Param("tags") List<String> tags,
+                                        @Param("tagMatch") String tagMatch);
+}
+````
+
+## File: note-service/src/main/java/com/note/service/mapper/UserMapper.java
+````java
+//day02
+package com.note.service.mapper;
+
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.note.service.entity.UserEntity;
+import org.apache.ibatis.annotations.Mapper;
+@Mapper
+public interface UserMapper extends BaseMapper<UserEntity> {
+}
+````
+
+## File: note-service/src/main/java/com/note/service/service/UserService.java
+````java
+//day02
+//package com.note.service.service;
+//
+//import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+//import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+//import com.note.service.dto.UserRegisterDTO;
+//import com.note.service.entity.UserEntity;
+//import com.note.service.mapper.UserMapper;
+//import org.springframework.stereotype.Service;
+//@Service
+//public class UserService extends ServiceImpl<UserMapper, UserEntity> {
+//
+//    public boolean register(UserRegisterDTO dto) {
+//        // 1. 判重
+//        boolean exist = baseMapper.selectCount(
+//                new QueryWrapper<UserEntity>()
+//                        .eq("username", dto.getUsername())
+//                        .or()
+//                        .eq("email", dto.getEmail())
+//        ) > 0;
+//        if (exist) return false;
+//
+//        // 2. 保存（密码先明文，Day3 再加密）
+//        UserEntity user = new UserEntity();
+//        user.setUsername(dto.getUsername());
+//        user.setPassword(dto.getPassword());
+//        user.setEmail(dto.getEmail());
+//        return save(user);
+//    }
+//}
+
+//day03-登录
+package com.note.service.service;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.note.service.common.exception.BusinessException;
+import com.note.service.dto.LoginDTO;
+import com.note.service.dto.UserRegisterDTO;
+import com.note.service.entity.UserEntity;
+import com.note.service.mapper.UserMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService extends ServiceImpl<UserMapper, UserEntity> {
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    public void register(UserRegisterDTO dto) {
+        // 检查用户名
+        if (lambdaQuery().eq(UserEntity::getUsername, dto.getUsername()).count() > 0) {
+            throw new BusinessException(400, "用户名已存在");
+        }
+
+        // 检查邮箱
+        if (lambdaQuery().eq(UserEntity::getEmail, dto.getEmail()).count() > 0) {
+            throw new BusinessException(400, "邮箱已被注册");
+        }
+
+        // 创建用户（密码加密）
+        UserEntity user = new UserEntity();
+        user.setUsername(dto.getUsername());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setEmail(dto.getEmail());
+
+        save(user);
+    }
+
+    public UserEntity login(LoginDTO dto) {
+        UserEntity user = lambdaQuery()
+                .eq(UserEntity::getUsername, dto.getUsername())
+                .one();
+
+        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BusinessException(400, "用户名或密码错误");
+        }
+
+        return user;
+    }
+}
+````
+
+## File: note-ui/index.html
+````html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>note-ui</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+````
+
+## File: note-ui/src/store/user.js
+````javascript
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+export const useUserStore = defineStore('user', () => {
+    // State
+    const token = ref(localStorage.getItem('token') || '')
+    // const userInfo = ref(null)
+    const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
+
+    // Getters
+    const isLoggedIn = computed(() => !!token.value)
+
+    // Actions
+    const setToken = (newToken) => {
+        token.value = newToken
+        localStorage.setItem('token', newToken)
+    }
+
+    const setUserInfo = (info) => {
+        userInfo.value = info
+        localStorage.setItem('userInfo',JSON.stringify(info))//持久化
+    }
+
+    const logout = () => {
+        token.value = ''
+        userInfo.value = null
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+    }
+
+    return {
+        token,
+        userInfo,
+        isLoggedIn,
+        setToken,
+        setUserInfo,
+        logout
+    }
+})
+````
+
+## File: note-ui/src/utils/request.js
+````javascript
+import axios from 'axios'
+import { useUserStore } from '@/store/user'
+import { ElMessage } from 'element-plus'
+import router from '@/router'
+
+const request = axios.create({
+    baseURL: 'http://localhost:8080/api',
+    timeout: 10000,
+    headers: {
+        'Content-Type': 'application/json'
+    }
+})
+
+// 请求拦截器：自动添加 Token
+request.interceptors.request.use(
+    (config) => {
+        const userStore = useUserStore()
+        if (userStore.token) {
+            config.headers.Authorization = `Bearer ${userStore.token}`
+        }
+        return config
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+// 响应拦截器：统一错误处理
+request.interceptors.response.use(
+    (response) => {
+        const res = response.data
+        // 你的 Result 包装格式：{ code, message, data }
+        // 成功响应（200）
+        if (res.code === 200) {
+            return res.data//只返回data部分
+        }
+        // 业务错误（400，401，404）
+        const message=res.message || '请求失败'
+        ElMessage.error(message)
+
+        // 401令牌过期
+        if (res.code === 401){
+            const userStore=useUserStore()
+            userStore.logout()
+            router.push("/login")
+        }
+
+        return Promise.reject({
+            code:res.code,
+            message:message,
+            data:res.data
+        })
+    },
+    (error) => {
+        const { response } = error
+        if (!response) {
+            // 网络完全断开，只弹一次
+            ElMessage.error({ message: '网络连接失败，请检查后端服务', grouping: true })
+            return Promise.reject(error)
+        }
+
+        if (response?.status === 401 || response?.status=== 403) {
+            ElMessage.error('登录已过期，请重新登录')
+            const userStore = useUserStore()
+            userStore.logout()
+            router.push('/login')
+        } else {
+            ElMessage.error({ message: response?.data?.message || '请求失败', grouping: true })
+        }
+
+        return Promise.reject(error)
+    }
+)
+
+export default request
+````
+
+## File: note-ui/src/views/Layout.vue
+````vue
+<template>
+  <el-container class="layout">
+    <el-header class="header">
+      <div class="logo">Note-lite</div>
+      <div class="user-info">
+        <span>{{ userStore.userInfo?.username }}</span>
+        <el-button type="text" @click="logout">退出</el-button>
+      </div>
+    </el-header>
+
+    <el-container>
+      <el-aside width="200px" class="aside">
+        <el-menu
+            :router="true"
+            :default-active="$route.path"
+            class="menu"
+        >
+          <el-menu-item index="/">
+            <el-icon><Document /></el-icon>
+            <span>我的笔记</span>
+          </el-menu-item>
+          <el-menu-item index="/recycle">  <!-- day05新增 -->
+            <el-icon><Delete /></el-icon>
+            <span>回收站</span>
+          </el-menu-item>
+          <el-menu-item index="/note/new">
+            <el-icon><Plus /></el-icon>
+            <span>新建笔记</span>
+          </el-menu-item>
+        </el-menu>
+      </el-aside>
+
+      <el-main class="main">
+        <router-view />
+      </el-main>
+    </el-container>
+  </el-container>
+</template>
+
+<script setup>
+import { useUserStore } from '@/store/user'
+import { useRouter } from 'vue-router'
+import { Document, Plus , Delete} from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+
+
+const userStore = useUserStore()
+const router = useRouter()
+
+const logout = () => {
+  userStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
+</script>
+
+<style scoped>
+.layout {
+  height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #dcdfe6;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #409eff;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.aside {
+  background: #fff;
+  border-right: 1px solid #dcdfe6;
+}
+
+.menu {
+  border-right: none;
+}
+
+.main {
+  background: #f5f7fa;
+  padding: 20px;
+}
+</style>
 ````
 
 ## File: note-ui/src/views/RecycleBin.vue
@@ -2199,132 +3570,131 @@ onMounted(loadRecycle)
 </style>
 ````
 
-## File: note-ui/tsconfig.json
-````json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "skipLibCheck": true,
+## File: note-ui/src/views/Register.vue
+````vue
+<!-- src/views/Register.vue 新增不在day4中-->
+<template>
+  <div class="register-container">
+    <el-card class="register-card">
+      <h2>用户注册</h2>
+      <el-form :model="registerForm" :rules="rules" ref="formRef">
+        <el-form-item prop="username">
+          <el-input v-model="registerForm.username" placeholder="用户名" />
+        </el-form-item>
+        <el-form-item prop="email">
+          <el-input v-model="registerForm.email" placeholder="邮箱" />
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input v-model="registerForm.password" type="password" placeholder="密码" />
+        </el-form-item>
+        <el-form-item prop="confirmPassword">
+          <el-input v-model="registerForm.confirmPassword" type="password" placeholder="确认密码" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleRegister" style="width: 100%">注册</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-link type="primary" @click="$router.push('/login')">已有账号？去登录</el-link>
+        </el-form-item>
+      </el-form>
+    </el-card>
+  </div>
+</template>
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+<script setup>
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
-  },
-  "include": ["src"]
-}
-````
+const router = useRouter()
+const formRef = ref(null)
 
-## File: note-ui/vite.config.js
-````javascript
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import path from 'path'
-
-export default defineConfig({
-    plugins: [vue()],
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, './src')
-        }
-    },
-    server: {
-        port: 5173,
-        open: true
-    }
+const registerForm = reactive({
+  username: '',
+  email:'',//新增邮箱校验
+  password: '',
+  confirmPassword: ''
 })
-````
 
-## File: package.json
-````json
-{
-  "dependencies": {
-    "lodash-es": "^4.17.23"
+const validatePass2 = (rule, value, callback) => {
+  if (value === '') {
+    callback(new Error('请再次输入密码'))
+  } else if (value !== registerForm.password) {
+    callback(new Error('两次输入密码不一致!'))
+  } else {
+    callback()
   }
 }
-````
 
-## File: README.md
-````markdown
-# Note-lite
-````
-
-## File: note-service/src/main/java/com/note/service/common/config/RedisConfig.java
-````java
-package com.note.service.common.config;
-
-//import com.fasterxml.jackson.databind.ObjectMapper;
-//import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-//import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
-
-//@Configuration
-//public class RedisConfig {
-//
-//    @Bean
-//    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-//        RedisTemplate<String, Object> template = new RedisTemplate<>();
-//        template.setConnectionFactory(factory);
-//
-//        // Key 用 String 序列化
-//        template.setKeySerializer(new StringRedisSerializer());
-//        template.setHashKeySerializer(new StringRedisSerializer());
-//
-//        // Value 用 JSON 序列化（带类型信息，便于反序列化）
-//        ObjectMapper mapper = new ObjectMapper();
-//        mapper.activateDefaultTyping(
-//                LaissezFaireSubTypeValidator.instance,
-//                ObjectMapper.DefaultTyping.NON_FINAL
-//        );
-//        GenericJackson2JsonRedisSerializer serializer =
-//                new GenericJackson2JsonRedisSerializer(mapper);
-//
-//        template.setValueSerializer(serializer);
-//        template.setHashValueSerializer(serializer);
-//        template.afterPropertiesSet();
-//
-//        return template;
-//    }
-//}
-@Configuration
-public class RedisConfig {
-
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(factory);
-
-        // Key 用 String 序列化
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setHashKeySerializer(new StringRedisSerializer());
-
-        // Value 只序列化字符串，避免反序列化漏洞
-        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
-        template.setValueSerializer(stringRedisSerializer);
-        template.setHashValueSerializer(stringRedisSerializer);
-
-        template.afterPropertiesSet();
-        return template;
-    }
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validatePass2, trigger: 'blur' }
+  ]
 }
+
+// const handleRegister = async () => {
+//   if (!formRef.value) return
+//
+//   await formRef.value.validate((valid) => {
+//     if (valid) {
+//       // TODO: 调用注册接口
+//       ElMessage.success('注册成功')
+//       router.push('/login')
+//     }
+//   })
+// }
+
+import request from '@/utils/request'
+//注册接口的完善
+const handleRegister = async () => {
+  if (!formRef.value) return
+
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = await request.post('/ums/register', {
+          username: registerForm.username,
+          email: registerForm.email,
+          password: registerForm.password
+        })
+        ElMessage.success('注册成功，请登录')
+        router.push('/login')
+      } catch (error) {
+        // 错误已在拦截器处理
+        console.error('注册失败:', error)
+      }
+    }
+  })
+}
+
+</script>
+
+<style scoped>
+.register-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.register-card {
+  width: 400px;
+}
+</style>
 ````
 
 ## File: note-service/src/main/java/com/note/service/common/config/SecurityConfig.java
@@ -2373,6 +3743,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/share/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 添加 JWT 过滤器
@@ -2388,460 +3759,116 @@ public class SecurityConfig {
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/config/SwaggerConfig.java
+## File: note-service/src/main/java/com/note/service/controller/UserController.java
 ````java
-package com.note.service.config;
-
 //day02
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.info.Contact;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+//package com.note.service.controller;
+//
+//
+//import com.note.service.dto.UserRegisterDTO;
+//import com.note.service.service.UserService;
+//import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.http.ResponseEntity;
+//import org.springframework.web.bind.annotation.*;
+//@RestController
+//@RequestMapping("/api/ums")
+//public class UserController {
+//
+//    @Autowired
+//    private UserService userService;
+//
+//    @PostMapping("/register")
+//    public ResponseEntity<String> register(@RequestBody UserRegisterDTO dto) {
+//        boolean ok = userService.register(dto);
+//        return ok ? ResponseEntity.ok("注册成功")
+//                : ResponseEntity.badRequest().body("用户名或邮箱已存在");
+//    }
+//}
 
-@Configuration
-public class SwaggerConfig {  // 类名可以不改，或改为 Knife4jConfig
-
-    @Bean
-    public OpenAPI openAPI() {
-        return new OpenAPI()
-                .info(new Info()
-                        .title("Note Service API")
-                        .version("1.0")
-                        .description("笔记服务接口文档")
-                        .contact(new Contact()
-                                .name("作者")
-                                .email("your.email@example.com")));
-    }
-}
-````
-
-## File: note-service/src/main/java/com/note/service/controller/NoteController.java
-````java
+//day03
 package com.note.service.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.note.service.common.util.JwtUtils;
 import com.note.service.common.vo.Result;
-import com.note.service.dto.NoteDTO;
-import com.note.service.dto.NoteQueryDTO;
-import com.note.service.entity.NoteEntity;
-import com.note.service.service.NoteService;
-import com.note.service.mapper.NoteTagMapper;
+import com.note.service.dto.LoginDTO;
+import com.note.service.dto.UserRegisterDTO;
+import com.note.service.entity.UserEntity;
+import com.note.service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import lombok.extern.slf4j.Slf4j;  // 如果用 Lombok
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.Map;
 
-@Slf4j
 @RestController
-@RequestMapping("/api/note")
-@RequiredArgsConstructor
+@RequestMapping("/api/ums")
 @Validated
-@Tag(name = "笔记管理", description = "笔记的增删改查与标签管理")
-public class NoteController {
+public class UserController {
 
+    @Autowired
+    private UserService userService;
 
-    private final NoteService noteService;
-    private final NoteTagMapper noteTagMapper;          // 用于 /tags 接口
-    private final StringRedisTemplate stringRedisTemplate;
-    private final ObjectMapper objectMapper;            // Spring Boot 自动注册，直接注入即可
+    @Autowired
+    private JwtUtils jwtUtils;
 
-    @PostMapping
-    @Operation(summary = "创建笔记")
-    public Result<Long> create(@RequestBody @Valid NoteDTO dto,
-                               @AuthenticationPrincipal Long userId) {
-        Long noteId = noteService.createNote(userId, dto);
-        return Result.success(noteId);
+    @PostMapping("/register")
+    @Operation(summary="用户注册")
+    public Result<String> register(@RequestBody @Valid UserRegisterDTO dto) {
+        userService.register(dto);
+        return Result.success("注册成功");
+
     }
 
-    @GetMapping("/{id}")
-    @Operation(summary = "获取笔记详情")
-    public Result<NoteEntity> detail(@PathVariable Long id,
-                                     @AuthenticationPrincipal Long userId) {
-        return Result.success(noteService.getDetail(id, userId));
+    @PostMapping("/login")
+    public Result<Map<String, Object>> login(@RequestBody @Valid LoginDTO dto) {
+        UserEntity user = userService.login(dto);
+
+        // 生成 JWT
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", token);
+        result.put("userId", user.getId());
+        result.put("username", user.getUsername());
+
+        return Result.success(result);
     }
 
 
-    @PutMapping("/{id}")
-    @Operation(summary = "更新笔记")
-    public Result<Void> update(@PathVariable Long id,
-                               @RequestBody @Valid NoteDTO dto,
-                               @AuthenticationPrincipal Long userId) {
-        noteService.updateNote(id, userId, dto);
-        return Result.success();
-    }
-
-    @DeleteMapping("/{id}")
-    @Operation(summary = "删除笔记（默认软删除，permanent=true 物理删除）")
-    public Result<Void> delete(@PathVariable Long id,
-                               @RequestParam(defaultValue = "false") boolean permanent,
-                               @AuthenticationPrincipal Long userId) {
-        noteService.deleteNote(id, userId, permanent);
-        return Result.success();
-    }
-
-    @GetMapping("/page")
-    @Operation(summary = "分页查询笔记列表")
-    public Result<Page<NoteEntity>> page(NoteQueryDTO query,
-                                         @AuthenticationPrincipal Long userId) {
-        return Result.success(noteService.pageQuery(userId, query));
-    }
-
-    // ==================== 回收站接口 ====================
-
-    @GetMapping("/recycle/page")
-    @Operation(summary = "获取回收站列表")
-    public Result<Page<NoteEntity>> recyclePage(NoteQueryDTO query,
-                                                @AuthenticationPrincipal Long userId) {
-        query.setIsDeleted(1);
-        return Result.success(noteService.pageRecycle(userId, query));
-    }
-
-    @PutMapping("/{id}/restore")
-    @Operation(summary = "从回收站恢复笔记")
-    public Result<Void> restore(@PathVariable Long id,
-                                @AuthenticationPrincipal Long userId) {
-        noteService.restoreFromRecycle(id, userId);
-        return Result.success();
-    }
-
-    @DeleteMapping("/recycle/clear")
-    @Operation(summary = "清空回收站")
-    public Result<Void> clearRecycle(@AuthenticationPrincipal Long userId) {
-        noteService.clearRecycle(userId);
-        return Result.success();
-    }
-
-    // ==================== 标签接口 ====================
-
-    @GetMapping("/tags")
-    @Operation(summary = "获取当前用户所有标签")
-    public Result<List<String>> getUserTags(@AuthenticationPrincipal Long userId) {
-        List<String> tags = noteTagMapper.selectDistinctTagsByUserId(userId);
-        return Result.success(tags);
-    }
-
-    // ==================== 草稿接口（Jackson 版）====================
-
-    /**
-     * 构建草稿 Redis Key
-     * 新建笔记草稿：note:draft:{userId}:new
-     * 已有笔记草稿：note:draft:{userId}:{noteId}
-     */
-    private String buildDraftKey(Long userId, Long noteId) {
-        if (noteId != null) {
-            return "note:draft:" + userId + ":" + noteId;
-        }
-        // 新建笔记用固定后缀 "new"，避免多 tab 歧义时 key 混乱
-        // 已知限制：同用户同时新建多篇时会覆盖，可接受（面试可讲）
-        return "note:draft:" + userId + ":new";
-    }
-
-    @PostMapping("/draft")
-    @Operation(summary = "自动保存草稿（3秒防抖后前端触发）")
-    public Result<Void> saveDraft(@RequestBody NoteDTO dto,
-                                  @AuthenticationPrincipal Long userId) {
-        String key = buildDraftKey(userId, dto.getId());
-        try {
-            String json = objectMapper.writeValueAsString(dto);
-            stringRedisTemplate.opsForValue().set(key, json, 7, TimeUnit.DAYS);
-            log.debug("草稿已保存: key={}", key);
-        } catch (JsonProcessingException e) {
-            // 序列化失败不影响主流程，只记录日志
-            log.error("草稿序列化失败: userId={}, noteId={}", userId, dto.getId(), e);
-        }
-        return Result.success();
-    }
-
-    @GetMapping("/draft")
-    @Operation(summary = "获取草稿（进入编辑页时查询）")
-    public Result<NoteDTO> getDraft(@RequestParam(required = false) Long noteId,
-                                    @AuthenticationPrincipal Long userId) {
-        String key = buildDraftKey(userId, noteId);
-        String json = stringRedisTemplate.opsForValue().get(key);
-
-        if (json == null) {
-            return Result.success(null);  // 无草稿，返回 null，前端正常处理
-        }
-
-        try {
-            NoteDTO draft = objectMapper.readValue(json, NoteDTO.class);
-            log.debug("草稿已读取: key={}", key);
-            return Result.success(draft);
-        } catch (JsonProcessingException e) {
-            // 草稿数据损坏，删除并返回 null
-            log.error("草稿反序列化失败，已清除: key={}", key, e);
-            stringRedisTemplate.delete(key);
-            return Result.success(null);
-        }
-    }
-
-    @DeleteMapping("/draft")
-    @Operation(summary = "清除草稿（保存成功后前端调用）")
-    public Result<Void> clearDraft(@RequestParam(required = false) Long noteId,
-                                   @AuthenticationPrincipal Long userId) {
-        String key = buildDraftKey(userId, noteId);
-        Boolean deleted = stringRedisTemplate.delete(key);
-        log.debug("草稿已清除: key={}, existed={}", key, deleted);
-        return Result.success();
+    @GetMapping("/info")
+    public Result<UserEntity> getUserInfo() {
+        // 测试受保护接口，后续完善
+        return Result.success(new UserEntity());
     }
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/dto/NoteQueryDTO.java
+## File: note-service/src/main/java/com/note/service/dto/UserRegisterDTO.java
 ````java
+//day02
 package com.note.service.dto;
 
 import lombok.Data;
-//day05-添加标签筛选字段
-import java.util.List;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 @Data
-public class NoteQueryDTO {
-    private Integer pageNum = 1;
-    private Integer pageSize = 20;
-    private String keyword;      // 标题搜索（暂不实现内容搜索）
-    private Integer isDeleted = 0;
-    private List<String> tags;  //day05-标签筛选-新增
-    private String tagMatch="ANY";  //ANY-任意标签 ALL-全部标签-新增
-}
-````
-
-## File: note-service/src/main/java/com/note/service/entity/NoteEntity.java
-````java
-package com.note.service.entity;
-
-import com.baomidou.mybatisplus.annotation.*;
-import lombok.Data;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Arrays;
-import java.util.ArrayList;
-
-@Data
-@TableName("note")
-public class NoteEntity {
-
-    @TableId(type = IdType.AUTO)
-    private Long id;
-
-    private Long userId;
-    private String title;
-    private String content;
-    private String summary;
-
-    @TableField("is_deleted")
-    private Integer isDeleted;
-
-    private LocalDateTime deletedAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-
-    // 非数据库字段，用于接收 GROUP_CONCAT 结果
-    @TableField(exist = false)
-    private String tagNames;
-
-    @TableField(exist = false)
-    private List<String> tags;
-
-    // 解析 tagNames 到 tags 列表的方法
-    public void parseTagNames() {
-        if (this.tagNames != null && !this.tagNames.isEmpty()) {
-            this.tags = Arrays.asList(this.tagNames.split(","));
-        } else {
-            this.tags = new ArrayList<>();
-        }
-    }
-}
-````
-
-## File: note-service/src/main/java/com/note/service/entity/UserEntity.java
-````java
-//day02
-package com.note.service.entity;
-
-import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Data;
-import java.time.LocalDateTime;
-
-@Data
-@TableName("user")
-public class UserEntity {
-    private Long id;
+public class UserRegisterDTO {
+    @NotBlank(message = "用户名不能为空")
     private String username;
+
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 30, message = "密码长度 6-30 字符")
     private String password;
+
+    @Email(message = "邮箱格式错误")
+    @NotBlank(message = "邮箱不能为空")
     private String email;
-    private String avatarUrl;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-}
-````
-
-## File: note-service/src/main/java/com/note/service/mapper/NoteMapper.java
-````java
-package com.note.service.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.note.service.entity.NoteEntity;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-
-import java.util.List;
-
-@Mapper
-public interface NoteMapper extends BaseMapper<NoteEntity> {
-
-    // 分页查询用户的笔记（带标签聚合）
-    // 这个是原有的分页查询方法，在day05步骤二更改为 一下
-//    @Select("SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
-//            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
-//            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
-//            "GROUP BY n.id ORDER BY n.updated_at DESC")
-//    Page<NoteEntity> selectPageWithTags(Page<NoteEntity> page,
-//                                        @Param("userId") Long userId,
-//                                        @Param("isDeleted") Integer isDeleted);
-
-     //查询当前页数据（带标签筛选）- 手动分页
-     //
-    @Select("<script>" +
-            "SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
-            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
-            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
-            "<if test='keyword != null and keyword != \"\"'>" +
-            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
-            "</if>" +
-            "<if test='tags != null and tags.size() > 0'>" +
-            " AND n.id IN (" +
-            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
-            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
-            "   GROUP BY note_id " +
-            "   <if test='tagMatch == \"ALL\"'>" +
-            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
-            "   </if>" +
-            " )" +
-            "</if>" +
-            "GROUP BY n.id " +
-            "ORDER BY n.updated_at DESC " +
-            "LIMIT #{offset}, #{limit}" +
-            "</script>")
-    List<NoteEntity> selectWithTags(@Param("userId") Long userId,
-                                    @Param("isDeleted") Integer isDeleted,
-                                    @Param("keyword") String keyword,
-                                    @Param("tags") List<String> tags,
-                                    @Param("tagMatch") String tagMatch,
-                                    @Param("offset") long offset,
-                                    @Param("limit") long limit);
-
-    /**
-     * 查询总记录数（带标签筛选）- 使用 COUNT DISTINCT 确保准确
-     */
-    @Select("<script>" +
-            "SELECT COUNT(DISTINCT n.id) FROM note n " +
-            "LEFT JOIN note_tag nt ON n.id = nt.note_id " +
-            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
-            "<if test='keyword != null and keyword != \"\"'>" +
-            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
-            "</if>" +
-            "<if test='tags != null and tags.size() > 0'>" +
-            " AND n.id IN (" +
-            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
-            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
-            "   GROUP BY note_id " +
-            "   <if test='tagMatch == \"ALL\"'>" +
-            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
-            "   </if>" +
-            " )" +
-            "</if>" +
-            "</script>")
-    long countWithTags(@Param("userId") Long userId,
-                       @Param("isDeleted") Integer isDeleted,
-                       @Param("keyword") String keyword,
-                       @Param("tags") List<String> tags,
-                       @Param("tagMatch") String tagMatch);
-
-}
-````
-
-## File: note-service/src/main/java/com/note/service/mapper/NoteTagMapper.java
-````java
-package com.note.service.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.note.service.entity.NoteTagEntity;
-import com.note.service.entity.NoteEntity;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-
-import java.util.List;
-
-@Mapper
-public interface NoteTagMapper extends BaseMapper<NoteTagEntity> {
-
-
-    @Select("SELECT tag_name FROM note_tag WHERE note_id = #{noteId}")
-    List<String> selectTagsByNoteId(@Param("noteId") Long noteId);
-    // 根据用户ID查询所有不重复的标签（Day 5 步骤 14 需要的）- 这个可能没添加
-    @Select("SELECT DISTINCT tag_name FROM note_tag WHERE note_id IN " +
-            "(SELECT id FROM note WHERE user_id = #{userId})")
-    List<String> selectDistinctTagsByUserId(@Param("userId") Long userId);
-
-    //day05-添加标签筛选的分页查询
-    @Select("<script>" +
-            "SELECT n.*, GROUP_CONCAT(nt.tag_name) as tagNames " +
-            "FROM note n LEFT JOIN note_tag nt ON n.id = nt.note_id " +
-            "WHERE n.user_id = #{userId} AND n.is_deleted = #{isDeleted} " +
-            "<if test='keyword != null and keyword != \"\"'>" +
-            " AND n.title LIKE CONCAT('%', #{keyword}, '%')" +
-            "</if>" +
-            "<if test='tags != null and tags.size() > 0'>" +
-            " AND n.id IN (" +
-            "   SELECT note_id FROM note_tag WHERE tag_name IN " +
-            "   <foreach collection='tags' item='tag' open='(' separator=',' close=')'>#{tag}</foreach> " +
-            "   GROUP BY note_id " +
-            "   <if test='tagMatch == \"ALL\"'>" +
-            "   HAVING COUNT(DISTINCT tag_name) = #{tags.size}" +
-            "   </if>" +
-            " )" +
-            "</if>" +
-            "GROUP BY n.id ORDER BY n.updated_at DESC" +
-            "</script>")
-    Page<NoteEntity> selectPageWithTags(@Param("page") Page<NoteEntity> page,
-                                        @Param("userId") Long userId,
-                                        @Param("isDeleted") Integer isDeleted,
-                                        @Param("keyword") String keyword,
-                                        @Param("tags") List<String> tags,
-                                        @Param("tagMatch") String tagMatch);
-}
-````
-
-## File: note-service/src/main/java/com/note/service/mapper/UserMapper.java
-````java
-//day02
-package com.note.service.mapper;
-
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.note.service.entity.UserEntity;
-import org.apache.ibatis.annotations.Mapper;
-@Mapper
-public interface UserMapper extends BaseMapper<UserEntity> {
 }
 ````
 
@@ -3166,110 +4193,84 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
         return page;
     }
+
+    /**
+     * 获取笔记详情（无需权限，用于分享）
+     */
+    public NoteEntity getDetailWithoutAuth(Long noteId) {
+        NoteEntity note = baseMapper.selectById(noteId);
+        if (note == null || note.getIsDeleted() == 1) {
+            throw new BusinessException(404, "笔记不存在或已删除");
+        }
+        // 组装标签
+        List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
+        note.setTags(tags);
+        return note;
+    }
+
 }
 ````
 
-## File: note-service/src/main/java/com/note/service/service/UserService.java
-````java
-//day02
-//package com.note.service.service;
-//
-//import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-//import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-//import com.note.service.dto.UserRegisterDTO;
-//import com.note.service.entity.UserEntity;
-//import com.note.service.mapper.UserMapper;
-//import org.springframework.stereotype.Service;
-//@Service
-//public class UserService extends ServiceImpl<UserMapper, UserEntity> {
-//
-//    public boolean register(UserRegisterDTO dto) {
-//        // 1. 判重
-//        boolean exist = baseMapper.selectCount(
-//                new QueryWrapper<UserEntity>()
-//                        .eq("username", dto.getUsername())
-//                        .or()
-//                        .eq("email", dto.getEmail())
-//        ) > 0;
-//        if (exist) return false;
-//
-//        // 2. 保存（密码先明文，Day3 再加密）
-//        UserEntity user = new UserEntity();
-//        user.setUsername(dto.getUsername());
-//        user.setPassword(dto.getPassword());
-//        user.setEmail(dto.getEmail());
-//        return save(user);
-//    }
-//}
+## File: note-service/src/main/resources/application.yml
+````yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/note_db?createDatabaseIfNotExist=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: 1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
-//day03-登录
-package com.note.service.service;
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password:      # 无密码留空
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 100ms
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.note.service.common.exception.BusinessException;
-import com.note.service.dto.LoginDTO;
-import com.note.service.dto.UserRegisterDTO;
-import com.note.service.entity.UserEntity;
-import com.note.service.mapper.UserMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
 
-@Service
-public class UserService extends ServiceImpl<UserMapper, UserEntity> {
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    public void register(UserRegisterDTO dto) {
-        // 检查用户名
-        if (lambdaQuery().eq(UserEntity::getUsername, dto.getUsername()).count() > 0) {
-            throw new BusinessException(400, "用户名已存在");
-        }
-
-        // 检查邮箱
-        if (lambdaQuery().eq(UserEntity::getEmail, dto.getEmail()).count() > 0) {
-            throw new BusinessException(400, "邮箱已被注册");
-        }
-
-        // 创建用户（密码加密）
-        UserEntity user = new UserEntity();
-        user.setUsername(dto.getUsername());
-        user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        user.setEmail(dto.getEmail());
-
-        save(user);
-    }
-
-    public UserEntity login(LoginDTO dto) {
-        UserEntity user = lambdaQuery()
-                .eq(UserEntity::getUsername, dto.getUsername())
-                .one();
-
-        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-            throw new BusinessException(400, "用户名或密码错误");
-        }
-
-        return user;
-    }
-}
+jwt:
+  secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
+  expiration: 86400000  # 24小时，单位毫秒
 ````
 
-## File: note-ui/index.html
-````html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>note-ui</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
+## File: note-ui/package.json
+````json
+{
+  "name": "note-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "axios": "^1.13.6",
+    "element-plus": "^2.13.3",
+    "highlight.js": "^11.11.1",
+    "lodash-es": "^4.17.23",
+    "marked": "^17.0.3",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.29",
+    "vue-router": "^4.6.4"
+  }
+}
 ````
 
 ## File: note-ui/src/router/index.js
@@ -3317,6 +4318,12 @@ const routes = [
                 component: () => import('@/views/NoteEdit.vue')
             }
         ]
+    },
+    {
+        path: '/share/:code',
+        name: 'ShareView',
+        component: () => import('@/views/ShareView.vue'),
+        meta: { public: true }
     }
 ]
 
@@ -3331,7 +4338,7 @@ router.beforeEach((to, from, next) => {
 
     if (to.meta.requiresAuth && !userStore.token) {
         next('/login')
-    } else if (to.meta.public && userStore.token) {
+    } else if (to.meta.public && userStore.token && (to.path === '/login' || to.path === '/register')) {
         // 已登录用户访问登录页，跳首页
         next('/')
     } else {
@@ -3340,227 +4347,6 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
-````
-
-## File: note-ui/src/store/user.js
-````javascript
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-
-export const useUserStore = defineStore('user', () => {
-    // State
-    const token = ref(localStorage.getItem('token') || '')
-    // const userInfo = ref(null)
-    const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
-
-    // Getters
-    const isLoggedIn = computed(() => !!token.value)
-
-    // Actions
-    const setToken = (newToken) => {
-        token.value = newToken
-        localStorage.setItem('token', newToken)
-    }
-
-    const setUserInfo = (info) => {
-        userInfo.value = info
-        localStorage.setItem('userInfo',JSON.stringify(info))//持久化
-    }
-
-    const logout = () => {
-        token.value = ''
-        userInfo.value = null
-        localStorage.removeItem('token')
-        localStorage.removeItem('userInfo')
-    }
-
-    return {
-        token,
-        userInfo,
-        isLoggedIn,
-        setToken,
-        setUserInfo,
-        logout
-    }
-})
-````
-
-## File: note-ui/src/utils/request.js
-````javascript
-import axios from 'axios'
-import { useUserStore } from '@/store/user'
-import { ElMessage } from 'element-plus'
-import router from '@/router'
-
-const request = axios.create({
-    baseURL: 'http://localhost:8080/api',
-    timeout: 10000,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-})
-
-// 请求拦截器：自动添加 Token
-request.interceptors.request.use(
-    (config) => {
-        const userStore = useUserStore()
-        if (userStore.token) {
-            config.headers.Authorization = `Bearer ${userStore.token}`
-        }
-        return config
-    },
-    (error) => {
-        return Promise.reject(error)
-    }
-)
-
-// 响应拦截器：统一错误处理
-request.interceptors.response.use(
-    (response) => {
-        const res = response.data
-        // 你的 Result 包装格式：{ code, message, data }
-        // 成功响应（200）
-        if (res.code === 200) {
-            return res.data//只返回data部分
-        }
-        // 业务错误（400，401，404）
-        const message=res.message || '请求失败'
-        ElMessage.error(message)
-
-        // 401令牌过期
-        if (res.code === 401){
-            const userStore=useUserStore()
-            userStore.logout()
-            router.push("/login")
-        }
-
-        return Promise.reject({
-            code:res.code,
-            message:message,
-            data:res.data
-        })
-    },
-    (error) => {
-        const { response } = error
-        if (!response) {
-            // 网络完全断开，只弹一次
-            ElMessage.error({ message: '网络连接失败，请检查后端服务', grouping: true })
-            return Promise.reject(error)
-        }
-
-        if (response?.status === 401 || response?.status=== 403) {
-            ElMessage.error('登录已过期，请重新登录')
-            const userStore = useUserStore()
-            userStore.logout()
-            router.push('/login')
-        } else {
-            ElMessage.error({ message: response?.data?.message || '请求失败', grouping: true })
-        }
-
-        return Promise.reject(error)
-    }
-)
-
-export default request
-````
-
-## File: note-ui/src/views/Layout.vue
-````vue
-<template>
-  <el-container class="layout">
-    <el-header class="header">
-      <div class="logo">Note-lite</div>
-      <div class="user-info">
-        <span>{{ userStore.userInfo?.username }}</span>
-        <el-button type="text" @click="logout">退出</el-button>
-      </div>
-    </el-header>
-
-    <el-container>
-      <el-aside width="200px" class="aside">
-        <el-menu
-            :router="true"
-            :default-active="$route.path"
-            class="menu"
-        >
-          <el-menu-item index="/">
-            <el-icon><Document /></el-icon>
-            <span>我的笔记</span>
-          </el-menu-item>
-          <el-menu-item index="/recycle">  <!-- day05新增 -->
-            <el-icon><Delete /></el-icon>
-            <span>回收站</span>
-          </el-menu-item>
-          <el-menu-item index="/note/new">
-            <el-icon><Plus /></el-icon>
-            <span>新建笔记</span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
-
-      <el-main class="main">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
-</template>
-
-<script setup>
-import { useUserStore } from '@/store/user'
-import { useRouter } from 'vue-router'
-import { Document, Plus , Delete} from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-
-
-const userStore = useUserStore()
-const router = useRouter()
-
-const logout = () => {
-  userStore.logout()
-  ElMessage.success('已退出登录')
-  router.push('/login')
-}
-</script>
-
-<style scoped>
-.layout {
-  height: 100vh;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #fff;
-  border-bottom: 1px solid #dcdfe6;
-}
-
-.logo {
-  font-size: 20px;
-  font-weight: bold;
-  color: #409eff;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.aside {
-  background: #fff;
-  border-right: 1px solid #dcdfe6;
-}
-
-.menu {
-  border-right: none;
-}
-
-.main {
-  background: #f5f7fa;
-  padding: 20px;
-}
-</style>
 ````
 
 ## File: note-ui/src/views/Login.vue
@@ -4803,6 +5589,163 @@ onUnmounted(() => {
 </style>
 ````
 
+## File: note-service/pom.xml
+````xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.2.6</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>com.note</groupId>
+	<artifactId>note-service</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>note-service</name>
+	<description>note-service</description>
+
+	<properties>
+		<java.version>17</java.version>
+		<mybatis-plus.version>3.5.7</mybatis-plus.version>
+		<knife4j.version>4.4.0</knife4j.version>
+	</properties>
+
+	<dependencies>
+		<!-- Web -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- Validation -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- MyBatis-Plus（Spring Boot 3 专用版本） -->
+		<dependency>
+			<groupId>com.baomidou</groupId>
+			<artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+			<version>${mybatis-plus.version}</version>
+		</dependency>
+
+		<!-- Knife4j（替代 Springfox，支持 OpenAPI 3 和 Jakarta） -->
+		<dependency>
+			<groupId>com.github.xiaoymin</groupId>
+			<artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+			<version>${knife4j.version}</version>
+		</dependency>
+
+		<!-- MySQL -->
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Lombok -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- DevTools -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- 测试（修正artifactId） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.12.3</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.12.3</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.12.3</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Spring Security（若 Day1 未加） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!-- 参数校验（若 Day1 未加） -->
+
+
+		<!--添加Redis依赖-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-pool2</artifactId>
+		</dependency>
+
+
+
+<!--		&lt;!&ndash; SLF4J API &ndash;&gt;-->
+<!--		<dependency>-->
+<!--			<groupId>org.slf4j</groupId>-->
+<!--			<artifactId>slf4j-api</artifactId>-->
+<!--			<version>2.0.12</version>-->
+<!--		</dependency>-->
+
+<!--		&lt;!&ndash; 绑定具体日志实现（推荐 Logback） &ndash;&gt;-->
+<!--		<dependency>-->
+<!--			<groupId>ch.qos.logback</groupId>-->
+<!--			<artifactId>logback-classic</artifactId>-->
+<!--			<version>1.5.6</version>-->
+<!--		</dependency>-->
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>
+````
+
 ## File: note-ui/src/views/NoteList.vue
 ````vue
 <!--主页面原代码-->
@@ -5179,6 +6122,13 @@ onUnmounted(() => {
           >
             <el-icon><Delete /></el-icon>
           </button>
+          <button
+              class="share-btn"
+              @click.stop="generateShare(note.id)"
+              title="生成分享码"
+          >
+            <el-icon><Share /></el-icon>
+          </button>
         </div>
       </div>
     </div>
@@ -5199,7 +6149,7 @@ onUnmounted(() => {
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Plus, Delete, Search } from '@element-plus/icons-vue'
+import { Plus, Delete, Search, Share} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import TagFilter from '@/components/TagFilter.vue'
@@ -5285,6 +6235,18 @@ const softDelete = async (id) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
+  }
+}
+
+const generateShare = async (noteId) => {
+  try {
+    const res = await request.post('/share', { noteId, permission: 'READ' })
+    const shareCode = res.code
+    // 复制到剪贴板
+    await navigator.clipboard.writeText(shareCode)
+    ElMessage.success(`分享码已生成并复制：${shareCode}`)
+  } catch (error) {
+    ElMessage.error('生成分享码失败')
   }
 }
 
@@ -5665,463 +6627,4 @@ onMounted(() => {
   color: #6b5ce7;
 }
 </style>
-````
-
-## File: note-ui/src/views/Register.vue
-````vue
-<!-- src/views/Register.vue 新增不在day4中-->
-<template>
-  <div class="register-container">
-    <el-card class="register-card">
-      <h2>用户注册</h2>
-      <el-form :model="registerForm" :rules="rules" ref="formRef">
-        <el-form-item prop="username">
-          <el-input v-model="registerForm.username" placeholder="用户名" />
-        </el-form-item>
-        <el-form-item prop="email">
-          <el-input v-model="registerForm.email" placeholder="邮箱" />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input v-model="registerForm.password" type="password" placeholder="密码" />
-        </el-form-item>
-        <el-form-item prop="confirmPassword">
-          <el-input v-model="registerForm.confirmPassword" type="password" placeholder="确认密码" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleRegister" style="width: 100%">注册</el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-link type="primary" @click="$router.push('/login')">已有账号？去登录</el-link>
-        </el-form-item>
-      </el-form>
-    </el-card>
-  </div>
-</template>
-
-<script setup>
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-
-const router = useRouter()
-const formRef = ref(null)
-
-const registerForm = reactive({
-  username: '',
-  email:'',//新增邮箱校验
-  password: '',
-  confirmPassword: ''
-})
-
-const validatePass2 = (rule, value, callback) => {
-  if (value === '') {
-    callback(new Error('请再次输入密码'))
-  } else if (value !== registerForm.password) {
-    callback(new Error('两次输入密码不一致!'))
-  } else {
-    callback()
-  }
-}
-
-const rules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' },
-    { validator: validatePass2, trigger: 'blur' }
-  ]
-}
-
-// const handleRegister = async () => {
-//   if (!formRef.value) return
-//
-//   await formRef.value.validate((valid) => {
-//     if (valid) {
-//       // TODO: 调用注册接口
-//       ElMessage.success('注册成功')
-//       router.push('/login')
-//     }
-//   })
-// }
-
-import request from '@/utils/request'
-//注册接口的完善
-const handleRegister = async () => {
-  if (!formRef.value) return
-
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        const res = await request.post('/ums/register', {
-          username: registerForm.username,
-          email: registerForm.email,
-          password: registerForm.password
-        })
-        ElMessage.success('注册成功，请登录')
-        router.push('/login')
-      } catch (error) {
-        // 错误已在拦截器处理
-        console.error('注册失败:', error)
-      }
-    }
-  })
-}
-
-</script>
-
-<style scoped>
-.register-container {
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.register-card {
-  width: 400px;
-}
-</style>
-````
-
-## File: note-service/src/main/java/com/note/service/controller/UserController.java
-````java
-//day02
-//package com.note.service.controller;
-//
-//
-//import com.note.service.dto.UserRegisterDTO;
-//import com.note.service.service.UserService;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.http.ResponseEntity;
-//import org.springframework.web.bind.annotation.*;
-//@RestController
-//@RequestMapping("/api/ums")
-//public class UserController {
-//
-//    @Autowired
-//    private UserService userService;
-//
-//    @PostMapping("/register")
-//    public ResponseEntity<String> register(@RequestBody UserRegisterDTO dto) {
-//        boolean ok = userService.register(dto);
-//        return ok ? ResponseEntity.ok("注册成功")
-//                : ResponseEntity.badRequest().body("用户名或邮箱已存在");
-//    }
-//}
-
-//day03
-package com.note.service.controller;
-
-import com.note.service.common.util.JwtUtils;
-import com.note.service.common.vo.Result;
-import com.note.service.dto.LoginDTO;
-import com.note.service.dto.UserRegisterDTO;
-import com.note.service.entity.UserEntity;
-import com.note.service.service.UserService;
-import io.swagger.v3.oas.annotations.Operation;
-import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
-
-@RestController
-@RequestMapping("/api/ums")
-@Validated
-public class UserController {
-
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @PostMapping("/register")
-    @Operation(summary="用户注册")
-    public Result<String> register(@RequestBody @Valid UserRegisterDTO dto) {
-        userService.register(dto);
-        return Result.success("注册成功");
-
-    }
-
-    @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody @Valid LoginDTO dto) {
-        UserEntity user = userService.login(dto);
-
-        // 生成 JWT
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername());
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("userId", user.getId());
-        result.put("username", user.getUsername());
-
-        return Result.success(result);
-    }
-
-
-    @GetMapping("/info")
-    public Result<UserEntity> getUserInfo() {
-        // 测试受保护接口，后续完善
-        return Result.success(new UserEntity());
-    }
-}
-````
-
-## File: note-service/src/main/java/com/note/service/dto/UserRegisterDTO.java
-````java
-//day02
-package com.note.service.dto;
-
-import lombok.Data;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
-
-@Data
-public class UserRegisterDTO {
-    @NotBlank(message = "用户名不能为空")
-    private String username;
-
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 30, message = "密码长度 6-30 字符")
-    private String password;
-
-    @Email(message = "邮箱格式错误")
-    @NotBlank(message = "邮箱不能为空")
-    private String email;
-}
-````
-
-## File: note-service/src/main/resources/application.yml
-````yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/note_db?createDatabaseIfNotExist=true&serverTimezone=Asia/Shanghai
-    username: root
-    password: 1234
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      # password:      # 无密码留空
-      database: 0
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: 100ms
-
-mybatis-plus:
-  configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl   # 控制台打印 SQL
-
-jwt:
-  secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
-  expiration: 86400000  # 24小时，单位毫秒
-````
-
-## File: note-ui/package.json
-````json
-{
-  "name": "note-ui",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.4",
-    "typescript": "~5.9.3",
-    "vite": "^7.2.4"
-  },
-  "dependencies": {
-    "@element-plus/icons-vue": "^2.3.2",
-    "axios": "^1.13.6",
-    "element-plus": "^2.13.3",
-    "highlight.js": "^11.11.1",
-    "lodash-es": "^4.17.23",
-    "marked": "^17.0.3",
-    "pinia": "^3.0.4",
-    "vue": "^3.5.29",
-    "vue-router": "^4.6.4"
-  }
-}
-````
-
-## File: note-service/pom.xml
-````xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.6</version>
-		<relativePath/>
-	</parent>
-
-	<groupId>com.note</groupId>
-	<artifactId>note-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>note-service</name>
-	<description>note-service</description>
-
-	<properties>
-		<java.version>17</java.version>
-		<mybatis-plus.version>3.5.7</mybatis-plus.version>
-		<knife4j.version>4.4.0</knife4j.version>
-	</properties>
-
-	<dependencies>
-		<!-- Web -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-
-		<!-- Validation -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
-
-		<!-- MyBatis-Plus（Spring Boot 3 专用版本） -->
-		<dependency>
-			<groupId>com.baomidou</groupId>
-			<artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-			<version>${mybatis-plus.version}</version>
-		</dependency>
-
-		<!-- Knife4j（替代 Springfox，支持 OpenAPI 3 和 Jakarta） -->
-		<dependency>
-			<groupId>com.github.xiaoymin</groupId>
-			<artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-			<version>${knife4j.version}</version>
-		</dependency>
-
-		<!-- MySQL -->
-		<dependency>
-			<groupId>com.mysql</groupId>
-			<artifactId>mysql-connector-j</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
-		<!-- Lombok -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
-
-		<!-- DevTools -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-			<optional>true</optional>
-		</dependency>
-
-		<!-- 测试（修正artifactId） -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-api</artifactId>
-			<version>0.12.3</version>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-impl</artifactId>
-			<version>0.12.3</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-jackson</artifactId>
-			<version>0.12.3</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<!-- Spring Security（若 Day1 未加） -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-
-		<!-- 参数校验（若 Day1 未加） -->
-
-
-		<!--添加Redis依赖-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-redis</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-pool2</artifactId>
-		</dependency>
-
-
-
-<!--		&lt;!&ndash; SLF4J API &ndash;&gt;-->
-<!--		<dependency>-->
-<!--			<groupId>org.slf4j</groupId>-->
-<!--			<artifactId>slf4j-api</artifactId>-->
-<!--			<version>2.0.12</version>-->
-<!--		</dependency>-->
-
-<!--		&lt;!&ndash; 绑定具体日志实现（推荐 Logback） &ndash;&gt;-->
-<!--		<dependency>-->
-<!--			<groupId>ch.qos.logback</groupId>-->
-<!--			<artifactId>logback-classic</artifactId>-->
-<!--			<version>1.5.6</version>-->
-<!--		</dependency>-->
-	</dependencies>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
-</project>
 ````

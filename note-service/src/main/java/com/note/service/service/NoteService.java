@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.note.service.common.exception.BusinessException;
+import com.note.service.common.metrics.MicrometerMetrics;
 import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
 import com.note.service.entity.NoteEntity;
@@ -38,6 +39,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
     private static final String CACHE_NOTE_PREFIX = "note:detail:";
     private static final long CACHE_TTL_HOURS = 1;
     private final ObjectMapper objectMapper;
+    private final MicrometerMetrics metrics; //day08新增监控指标工具
 
     // ========== 核心 CRUD ==========
 
@@ -64,47 +66,57 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
     public NoteEntity getDetail(Long noteId, Long userId) {
 
-        // 1.首先尝试从缓存中获取
-        String cacheKey = CACHE_NOTE_PREFIX + noteId;
-        String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
-        if (cachedJson != null) {
-            log.info("缓存命中: noteId={}", noteId);
-            try {
-                // 反序列化 JSON 为 NoteEntity（注意：需要处理 tags 字段）
-                NoteEntity note = objectMapper.readValue(cachedJson, NoteEntity.class);
-                // 校验权限（缓存中不包含 userId 校验，需要额外检查）
-                if (!note.getUserId().equals(userId)) {
-                    throw new BusinessException(403, "无权访问");
+        // 监控：使用recordQuery包裹整段代码，自动记录整个方法的耗时
+        return metrics.recordQuery(() ->{
+            // 1.首先尝试从缓存中获取
+            String cacheKey = CACHE_NOTE_PREFIX + noteId;
+            String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
+            if (cachedJson != null) {
+                log.info("缓存命中: noteId={}", noteId);
+                metrics.recordCacheHit(); // 命中计数器 +1
+                try {
+                    // 反序列化 JSON 为 NoteEntity（注意：需要处理 tags 字段）
+                    NoteEntity note = objectMapper.readValue(cachedJson, NoteEntity.class);
+                    // 校验权限（缓存中不包含 userId 校验，需要额外检查）
+                    if (!note.getUserId().equals(userId)) {
+                        throw new BusinessException(403, "无权访问");
+                    }
+                    if (note.getIsDeleted() == 1) {
+                        throw new BusinessException(404, "笔记已在回收站");
+                    }
+                    return note;
+                } catch (JsonProcessingException e) {
+                    log.error("缓存反序列化失败: noteId={}", noteId, e);
+                    // 解析失败，删除缓存并继续查数据库
+                    stringRedisTemplate.delete(cacheKey);
                 }
-                if (note.getIsDeleted() == 1) {
-                    throw new BusinessException(404, "笔记已在回收站");
-                }
-                return note;
-            } catch (JsonProcessingException e) {
-                log.error("缓存反序列化失败: noteId={}", noteId, e);
-                // 解析失败，删除缓存并继续查数据库
-                stringRedisTemplate.delete(cacheKey);
+            } else {
+                log.info("缓存未命中: noteId={}", noteId);
+                metrics.recordCacheMiss(); // 未命中计数器 +1
             }
-        } else {
-            log.info("缓存未命中: noteId={}", noteId);
-        }
 
-        // 2.缓存未命中，查数据库
-        NoteEntity note = baseMapper.selectById(noteId);
-        if (note == null || !note.getUserId().equals(userId)) {
-            throw new BusinessException(404, "笔记不存在或无权限");
-        }
-        if (note.getIsDeleted() == 1) {
-            throw new BusinessException(404, "笔记已在回收站");
-        }
+            // 2.缓存未命中，查数据库
+            NoteEntity note = baseMapper.selectById(noteId);
+            if (note == null || !note.getUserId().equals(userId)) {
+                throw new BusinessException(404, "笔记不存在或无权限");
+            }
+            if (note.getIsDeleted() == 1) {
+                throw new BusinessException(404, "笔记已在回收站");
+            }
 
-        // 组装标签
-        List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
-        note.setTags(tags);
+            // 组装标签
+            List<String> tags = noteTagMapper.selectTagsByNoteId(noteId);
+            note.setTags(tags);
 
-        // 3.写入缓存（异步或者同步，这里写同步）day07
-
-        return note;
+            // 3.写入缓存（异步或者同步，这里写同步）day07
+            try {
+                String json = objectMapper.writeValueAsString(note);
+                stringRedisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL_HOURS, TimeUnit.HOURS);
+            } catch (JsonProcessingException e) {
+                log.error("缓存写入失败: noteId={}", noteId, e);
+            }
+            return note;
+        });
     }
 
     //新增清除缓存的方法

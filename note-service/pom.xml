@@ -117,6 +117,18 @@
 			<artifactId>commons-pool2</artifactId>
 		</dependency>
 
+		<!-- Micrometer Prometheus 注册器（自动将指标暴露为 Prometheus 格式） -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+
+		<!-- Spring Boot Actuator（提供 /actuator/prometheus 端点） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 
 
 <!--		&lt;!&ndash; SLF4J API &ndash;&gt;-->

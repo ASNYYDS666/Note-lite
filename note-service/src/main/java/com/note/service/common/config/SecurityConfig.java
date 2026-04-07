@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
+                        .requestMatchers("/actuator/prometheus", "/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 添加 JWT 过滤器

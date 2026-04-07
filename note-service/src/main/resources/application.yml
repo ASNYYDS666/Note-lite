@@ -26,5 +26,18 @@ jwt:
   secret: your-secret-key-note-lite-2024-very-long-key-at-least-32-bytes-ok
   expiration: 86400000  # 24小时，单位毫秒
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus, health, info
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: note-service  # 全局标签，会添加到所有指标中
+
 
 

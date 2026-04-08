@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s      # 每15秒抓取一次
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'note-service'
+    static_configs:
+      - targets: ['host.docker.internal:8080']   # Windows/Mac 使用 host.docker.internal，Linux 使用 172.17.0.1 或实际宿主机IP
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s

@@ -34,6 +34,8 @@ The content is organized as follows:
 
 # Directory Structure
 ```
+docker-compose.yml
+docker/prometheus/prometheus.yml
 note-service/.gitattributes
 note-service/.gitignore
 note-service/.mvn/wrapper/maven-wrapper.properties
@@ -103,6 +105,57 @@ README.md
 ```
 
 # Files
+
+## File: docker-compose.yml
+````yaml
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: note-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: note-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin   # 初始密码，登录后可以修改
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+````
+
+## File: docker/prometheus/prometheus.yml
+````yaml
+global:
+  scrape_interval: 15s      # 每15秒抓取一次
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'note-service'
+    static_configs:
+      - targets: ['host.docker.internal:8080']   # Windows/Mac 使用 host.docker.internal，Linux 使用 172.17.0.1 或实际宿主机IP
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+````
 
 ## File: note-service/.gitattributes
 ````

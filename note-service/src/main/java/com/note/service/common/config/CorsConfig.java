@@ -28,6 +28,7 @@ public class CorsConfig {
         config.addAllowedOrigin("http://localhost:5173");
         // 允许 React 或其他前端常用端口（可选，不影响功能）
         config.addAllowedOrigin("http://localhost:3000");
+        config.addAllowedOrigin("http://localhost:3100");
         // 如果需要部署到线上，可以添加域名
         // config.addAllowedOrigin("https://note.yourdomain.com");
 

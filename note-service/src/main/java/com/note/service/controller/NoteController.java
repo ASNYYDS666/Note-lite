@@ -1,13 +1,14 @@
 package com.note.service.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.vo.Result;
+import com.note.service.common.vo.NoteDetailVO;
 import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
-import com.note.service.entity.NoteEntity;
 import com.note.service.service.NoteService;
-import com.note.service.mapper.NoteTagMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/note")
+@RequestMapping("/api/v1/note")
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "笔记管理", description = "笔记的增删改查与标签管理")
@@ -34,7 +35,6 @@ public class NoteController {
 
 
     private final NoteService noteService;
-    private final NoteTagMapper noteTagMapper;          // 用于 /tags 接口
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;            // Spring Boot 自动注册，直接注入即可
 
@@ -48,15 +48,15 @@ public class NoteController {
 
     @GetMapping("/{id}")
     @Operation(summary = "获取笔记详情")
-    public Result<NoteEntity> detail(@PathVariable Long id,
+    public Result<NoteDetailVO> detail(@Parameter(description = "笔记ID") @PathVariable Long id,
                                      @AuthenticationPrincipal Long userId) {
-        return Result.success(noteService.getDetail(id, userId));
+        return Result.success(noteService.getDetailVO(id, userId));
     }
 
 
     @PutMapping("/{id}")
     @Operation(summary = "更新笔记")
-    public Result<Void> update(@PathVariable Long id,
+    public Result<Void> update(@Parameter(description = "笔记ID") @PathVariable Long id,
                                @RequestBody @Valid NoteDTO dto,
                                @AuthenticationPrincipal Long userId) {
         noteService.updateNote(id, userId, dto);
@@ -65,8 +65,8 @@ public class NoteController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除笔记（默认软删除，permanent=true 物理删除）")
-    public Result<Void> delete(@PathVariable Long id,
-                               @RequestParam(defaultValue = "false") boolean permanent,
+    public Result<Void> delete(@Parameter(description = "笔记ID") @PathVariable Long id,
+                               @Parameter(description = "true=物理删除, false=软删除移入回收站") @RequestParam(defaultValue = "false") boolean permanent,
                                @AuthenticationPrincipal Long userId) {
         noteService.deleteNote(id, userId, permanent);
         return Result.success();
@@ -74,7 +74,7 @@ public class NoteController {
 
     @GetMapping("/page")
     @Operation(summary = "分页查询笔记列表")
-    public Result<Page<NoteEntity>> page(NoteQueryDTO query,
+    public Result<Page<NoteDetailVO>> page(NoteQueryDTO query,
                                          @AuthenticationPrincipal Long userId) {
         return Result.success(noteService.pageQuery(userId, query));
     }
@@ -83,7 +83,7 @@ public class NoteController {
 
     @GetMapping("/recycle/page")
     @Operation(summary = "获取回收站列表")
-    public Result<Page<NoteEntity>> recyclePage(NoteQueryDTO query,
+    public Result<Page<NoteDetailVO>> recyclePage(NoteQueryDTO query,
                                                 @AuthenticationPrincipal Long userId) {
         query.setIsDeleted(1);
         return Result.success(noteService.pageRecycle(userId, query));
@@ -91,7 +91,7 @@ public class NoteController {
 
     @PutMapping("/{id}/restore")
     @Operation(summary = "从回收站恢复笔记")
-    public Result<Void> restore(@PathVariable Long id,
+    public Result<Void> restore(@Parameter(description = "笔记ID") @PathVariable Long id,
                                 @AuthenticationPrincipal Long userId) {
         noteService.restoreFromRecycle(id, userId);
         return Result.success();
@@ -109,8 +109,7 @@ public class NoteController {
     @GetMapping("/tags")
     @Operation(summary = "获取当前用户所有标签")
     public Result<List<String>> getUserTags(@AuthenticationPrincipal Long userId) {
-        List<String> tags = noteTagMapper.selectDistinctTagsByUserId(userId);
-        return Result.success(tags);
+        return Result.success(noteService.getUserTags(userId));
     }
 
     // ==================== 草稿接口（Jackson 版）====================
@@ -122,11 +121,11 @@ public class NoteController {
      */
     private String buildDraftKey(Long userId, Long noteId) {
         if (noteId != null) {
-            return "note:draft:" + userId + ":" + noteId;
+            return CacheConstants.NOTE_DRAFT_PREFIX + userId + ":" + noteId;
         }
         // 新建笔记用固定后缀 "new"，避免多 tab 歧义时 key 混乱
         // 已知限制：同用户同时新建多篇时会覆盖，可接受（面试可讲）
-        return "note:draft:" + userId + ":new";
+        return CacheConstants.NOTE_DRAFT_PREFIX + userId + ":new";
     }
 
     @PostMapping("/draft")
@@ -136,7 +135,8 @@ public class NoteController {
         String key = buildDraftKey(userId, dto.getId());
         try {
             String json = objectMapper.writeValueAsString(dto);
-            stringRedisTemplate.opsForValue().set(key, json, 7, TimeUnit.DAYS);
+            stringRedisTemplate.opsForValue().set(key, json,
+                    CacheConstants.ttlWithJitter(CacheConstants.NOTE_DRAFT_TTL_SECONDS), TimeUnit.SECONDS);
             log.debug("草稿已保存: key={}", key);
         } catch (JsonProcessingException e) {
             // 序列化失败不影响主流程，只记录日志
@@ -147,7 +147,7 @@ public class NoteController {
 
     @GetMapping("/draft")
     @Operation(summary = "获取草稿（进入编辑页时查询）")
-    public Result<NoteDTO> getDraft(@RequestParam(required = false) Long noteId,
+    public Result<NoteDTO> getDraft(@Parameter(description = "笔记ID，不传则获取新建笔记草稿") @RequestParam(required = false) Long noteId,
                                     @AuthenticationPrincipal Long userId) {
         String key = buildDraftKey(userId, noteId);
         String json = stringRedisTemplate.opsForValue().get(key);
@@ -170,7 +170,7 @@ public class NoteController {
 
     @DeleteMapping("/draft")
     @Operation(summary = "清除草稿（保存成功后前端调用）")
-    public Result<Void> clearDraft(@RequestParam(required = false) Long noteId,
+    public Result<Void> clearDraft(@Parameter(description = "笔记ID，不传则清除新建笔记草稿") @RequestParam(required = false) Long noteId,
                                    @AuthenticationPrincipal Long userId) {
         String key = buildDraftKey(userId, noteId);
         Boolean deleted = stringRedisTemplate.delete(key);

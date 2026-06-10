@@ -1,7 +1,9 @@
 package com.note.service.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.exception.BusinessException;
+import com.note.service.common.exception.ErrorCode;
 import com.note.service.dto.ShareAccessDTO;
 import com.note.service.dto.ShareCreateDTO;
 import com.note.service.entity.NoteEntity;
@@ -28,9 +30,8 @@ public class ShareService {
     private final StringRedisTemplate stringRedisTemplate;
     private final NoteService noteService;
 
-    private static final String SHARE_REDIS_PREFIX = "share:";
     private static final int CODE_LENGTH = 8;
-    private static final int EXPIRE_DAYS = 7; // 分享码有效期7天
+    private static final int EXPIRE_DAYS = 7; // 分享码有效期7天（仅用于数据库 expire_at 计算）
 
     /**
      * 生成分享码（原子操作，无冲突）
@@ -40,7 +41,7 @@ public class ShareService {
         // 校验笔记是否存在且属于当前用户
         NoteEntity note = noteService.getDetail(dto.getNoteId(), userId);
         if (note == null) {
-            throw new BusinessException(404, "笔记不存在");
+            throw new BusinessException(ErrorCode.SHARE_NOTE_NOT_FOUND);
         }
 
         // 调用 Lua 脚本生成唯一分享码
@@ -54,10 +55,11 @@ public class ShareService {
         share.setExpireAt(LocalDateTime.now().plusDays(EXPIRE_DAYS));
         shareMapper.insert(share);
 
-        // 写入 Redis（用于快速校验）
-        String redisKey = SHARE_REDIS_PREFIX + shareCode;
+        // 写入 Redis（用于快速校验，TTL 加随机偏移防雪崩）
+        String redisKey = CacheConstants.SHARE_CODE_PREFIX + shareCode;
         String value = share.getNoteId() + ":" + share.getPermission();
-        stringRedisTemplate.opsForValue().set(redisKey, value, EXPIRE_DAYS, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(redisKey, value,
+                CacheConstants.ttlWithJitter(CacheConstants.SHARE_CODE_TTL_SECONDS), TimeUnit.SECONDS);
 
         log.info("生成分享码: noteId={}, code={}", note.getId(), shareCode);
         return shareCode;
@@ -67,8 +69,15 @@ public class ShareService {
      * 通过分享码获取笔记内容（无需登录）
      */
     public ShareAccessDTO accessByCode(String code) {
+        // 0. 检查空值缓存（防穿透）
+        String nullKey = CacheConstants.SHARE_CODE_NULL_PREFIX + code;
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(nullKey))) {
+            log.info("分享码空值缓存命中: code={}", code);
+            throw new BusinessException(ErrorCode.SHARE_CODE_INVALID);
+        }
+
         // 1. 从 Redis 获取
-        String redisKey = SHARE_REDIS_PREFIX + code;
+        String redisKey = CacheConstants.SHARE_CODE_PREFIX + code;
         String cached = stringRedisTemplate.opsForValue().get(redisKey);
         if (cached != null) {
             String[] parts = cached.split(":");
@@ -84,20 +93,24 @@ public class ShareService {
                 .ge(ShareEntity::getExpireAt, LocalDateTime.now());
         ShareEntity share = shareMapper.selectOne(wrapper);
         if (share == null) {
-            throw new BusinessException(404, "分享码不存在或已过期");
+            // 防穿透：对无效分享码缓存空值
+            stringRedisTemplate.opsForValue().set(nullKey, "1",
+                    CacheConstants.SHARE_CODE_NULL_TTL_SECONDS, TimeUnit.SECONDS);
+            throw new BusinessException(ErrorCode.SHARE_CODE_INVALID);
         }
 
         NoteEntity note = noteService.getDetailWithoutAuth(share.getNoteId());
-        // 回写 Redis
+        // 回写 Redis（TTL 加随机偏移防雪崩）
         String value = share.getNoteId() + ":" + share.getPermission();
-        stringRedisTemplate.opsForValue().set(redisKey, value, EXPIRE_DAYS, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(redisKey, value,
+                CacheConstants.ttlWithJitter(CacheConstants.SHARE_CODE_TTL_SECONDS), TimeUnit.SECONDS);
 
         return buildAccessDTO(note, share.getPermission());
     }
 
     private ShareAccessDTO buildAccessDTO(NoteEntity note, String permission) {
         ShareAccessDTO dto = new ShareAccessDTO();
-        dto.setNote(note);
+        dto.setNote(noteService.convertToVO(note));
         dto.setPermission(permission);
         return dto;
     }
@@ -111,6 +124,7 @@ public class ShareService {
                 "local key_prefix = ARGV[1] " +
                         "local code_length = tonumber(ARGV[2]) " +
                         "local max_attempts = tonumber(ARGV[3]) " +
+                        "local ttl = tonumber(ARGV[4]) " +
                         "for i = 1, max_attempts do " +
                         "   local code = '' " +
                         "   for j = 1, code_length do " +
@@ -121,7 +135,7 @@ public class ShareService {
                         "   end " +
                         "   local exists = redis.call('EXISTS', key_prefix .. code) " +
                         "   if exists == 0 then " +
-                        "       redis.call('SETEX', key_prefix .. code, 86400 * 7, 'temp') " +
+                        "       redis.call('SETEX', key_prefix .. code, ttl, 'temp') " +
                         "       return code " +
                         "   end " +
                         "end " +
@@ -129,9 +143,10 @@ public class ShareService {
 
         DefaultRedisScript<String> script = new DefaultRedisScript<>(luaScript, String.class);
         String code = stringRedisTemplate.execute(script, Collections.emptyList(),
-                SHARE_REDIS_PREFIX, String.valueOf(CODE_LENGTH), "10");
+                CacheConstants.SHARE_CODE_PREFIX, String.valueOf(CODE_LENGTH), "10",
+                String.valueOf(CacheConstants.SHARE_CODE_TTL_SECONDS));
         if (code == null) {
-            throw new BusinessException(500, "生成分享码失败，请重试");
+            throw new BusinessException(ErrorCode.SHARE_GENERATE_FAILED);
         }
         return code;
     }

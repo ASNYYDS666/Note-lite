@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;  // 添加这行！
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -40,9 +41,10 @@ public class SecurityConfig {
 
                 // 配置授权规则
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/ums/register", "/api/ums/login").permitAll()
+                        .requestMatchers("/api/v1/user/register", "/api/v1/user/login").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/api/share/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/share").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/share/**").permitAll()
                         .requestMatchers("/actuator/prometheus", "/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
                 )

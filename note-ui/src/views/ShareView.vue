@@ -110,8 +110,13 @@ onMounted(async () => {
     const res = await request.get(`/share/${code}`)
     note.value = res.note
   } catch (err) {
-    // 请求拦截器已经处理了错误弹窗，这里只设置本地错误信息用于显示
-    error.value = err.message || '分享内容不存在或已过期'
+    if (err.code === 30001) {
+      error.value = '分享的笔记已被作者删除'
+    } else if (err.code === 30002) {
+      error.value = '该分享链接已过期，请联系分享者重新生成'
+    } else {
+      error.value = err.message || '分享内容不存在或已过期'
+    }
   } finally {
     loading.value = false
   }

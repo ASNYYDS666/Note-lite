@@ -1,4 +1,3 @@
-//day03
 package com.note.service.common.exception;
 
 import com.note.service.common.vo.Result;
@@ -17,7 +16,7 @@ public class GlobalExceptionHandler {
     public Result<String> handleValidationException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
         log.warn("参数校验失败: {}", message);
-        return Result.error(400, message);
+        return Result.error(ErrorCode.PARAM_VALIDATION_FAILED.getCode(), message);
     }
 
     // 处理业务异常（自定义）
@@ -30,7 +29,7 @@ public class GlobalExceptionHandler {
     // 处理其他所有异常
     @ExceptionHandler(Exception.class)
     public Result<String> handleException(Exception e) {
-        log.error("系统异常", e);
-        return Result.error("系统繁忙，请稍后重试");
+        log.error("系统异常: type={}, message={}", e.getClass().getName(), e.getMessage());
+        return Result.error(ErrorCode.SYSTEM_ERROR.getCode(), "系统繁忙，请稍后重试");
     }
 }

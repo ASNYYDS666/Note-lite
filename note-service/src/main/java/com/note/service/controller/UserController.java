@@ -1,47 +1,24 @@
-//day02
-//package com.note.service.controller;
-//
-//
-//import com.note.service.dto.UserRegisterDTO;
-//import com.note.service.service.UserService;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.http.ResponseEntity;
-//import org.springframework.web.bind.annotation.*;
-//@RestController
-//@RequestMapping("/api/ums")
-//public class UserController {
-//
-//    @Autowired
-//    private UserService userService;
-//
-//    @PostMapping("/register")
-//    public ResponseEntity<String> register(@RequestBody UserRegisterDTO dto) {
-//        boolean ok = userService.register(dto);
-//        return ok ? ResponseEntity.ok("注册成功")
-//                : ResponseEntity.badRequest().body("用户名或邮箱已存在");
-//    }
-//}
-
-//day03
 package com.note.service.controller;
 
 import com.note.service.common.util.JwtUtils;
+import com.note.service.common.vo.LoginVO;
 import com.note.service.common.vo.Result;
+import com.note.service.common.vo.UserInfoVO;
 import com.note.service.dto.LoginDTO;
 import com.note.service.dto.UserRegisterDTO;
 import com.note.service.entity.UserEntity;
 import com.note.service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-
+@Tag(name = "用户管理", description = "注册、登录、个人信息")
 @RestController
-@RequestMapping("/api/ums")
+@RequestMapping("/api/v1/user")
 @Validated
 public class UserController {
 
@@ -60,24 +37,31 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody @Valid LoginDTO dto) {
+    @Operation(summary = "用户登录")
+    public Result<LoginVO> login(@RequestBody @Valid LoginDTO dto) {
         UserEntity user = userService.login(dto);
 
-        // 生成 JWT
         String token = jwtUtils.generateToken(user.getId(), user.getUsername());
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("userId", user.getId());
-        result.put("username", user.getUsername());
+        LoginVO result = new LoginVO();
+        result.setToken(token);
+        result.setUserId(user.getId());
+        result.setUsername(user.getUsername());
 
         return Result.success(result);
     }
 
 
     @GetMapping("/info")
-    public Result<UserEntity> getUserInfo() {
-        // 测试受保护接口，后续完善
-        return Result.success(new UserEntity());
+    @Operation(summary = "获取当前用户信息")
+    public Result<UserInfoVO> getUserInfo(@AuthenticationPrincipal Long userId) {
+        UserEntity user = userService.getById(userId);
+        UserInfoVO vo = new UserInfoVO();
+        vo.setId(user.getId());
+        vo.setUsername(user.getUsername());
+        vo.setEmail(user.getEmail());
+        vo.setAvatarUrl(user.getAvatarUrl());
+        vo.setCreatedAt(user.getCreatedAt());
+        return Result.success(vo);
     }
 }

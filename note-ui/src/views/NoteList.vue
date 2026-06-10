@@ -491,7 +491,7 @@ const softDelete = async (id) => {
 const generateShare = async (noteId) => {
   try {
     const res = await request.post('/share', { noteId, permission: 'READ' })
-    const shareCode = res.code
+    const shareCode = res.shareCode
     // 复制到剪贴板
     await navigator.clipboard.writeText(shareCode)
     ElMessage.success(`分享码已生成并复制：${shareCode}`)

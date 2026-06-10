@@ -57,10 +57,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         // 登录和注册接口不需要 JWT 验证
         String path = request.getRequestURI();
-        return path.equals("/api/ums/login")
-                || path.equals("/api/ums/register")
+        return path.equals("/api/v1/user/login")
+                || path.equals("/api/v1/user/register")
                 || path.startsWith("/doc.html")        // Knife4j 页面
                 || path.startsWith("/webjars/")
-                || path.startsWith("/v3/api-docs/");
+                || path.startsWith("/v3/api-docs/")
+                || path.startsWith("/actuator/");
     }
 }

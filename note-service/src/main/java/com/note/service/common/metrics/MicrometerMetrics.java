@@ -15,6 +15,7 @@ import java.time.Duration;
 public class MicrometerMetrics {
     private final Counter cacheHitCounter;
     private final Counter cacheMissCounter;
+    private final Counter nullCacheHitCounter;
     private final Timer queryTimer;
 
     // 构造器通过MeterRegistry注册指标
@@ -28,6 +29,11 @@ public class MicrometerMetrics {
         // 缓存未命中次数计数器
         this.cacheMissCounter = Counter.builder("note.cache.miss")
                 .description("Number of cache misses for note detail")
+                .register(registry);
+
+        // 空值缓存命中次数计数器（穿透防护命中）
+        this.nullCacheHitCounter = Counter.builder("note.cache.null_hit")
+                .description("Number of null cache hits (cache penetration prevention)")
                 .register(registry);
 
         // 查询耗时计时器（记录所有 getDetail 的耗时，单位毫秒）
@@ -53,6 +59,11 @@ public class MicrometerMetrics {
         cacheMissCounter.increment();
     }
 
+    // 记录一次空值缓存命中（穿透防护生效）
+    public void recordNullCacheHit() {
+        nullCacheHitCounter.increment();
+    }
+
     // 记录耗时（自动计时）
     // 执行一个查询操作并自动记录耗时
     // @param supplier 待执行的业务逻辑（可能抛出异常）
@@ -62,8 +73,9 @@ public class MicrometerMetrics {
         return queryTimer.record(() -> {
             try {
                 return supplier.get();
+            } catch (RuntimeException e) {
+                throw e; // BusinessException 等运行时异常原样透传，保留错误码
             } catch (Exception e) {
-                // 将受检异常包装为非受检，因为 record() 方法只允许 Runnable 或 Supplier（不抛异常）
                 throw new RuntimeException(e);
             }
         });

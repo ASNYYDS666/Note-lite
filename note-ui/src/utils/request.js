@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 const request = axios.create({
-    baseURL: '/api', //改成了相对地址避免跨域问题
+    baseURL: '/api/v1', //改成了相对地址避免跨域问题
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json'
@@ -25,6 +25,22 @@ request.interceptors.request.use(
     }
 )
 
+// 错误码映射表：根据业务错误码决定处理策略
+const ERROR_HANDLERS = {
+    10004: () => {  // TOKEN_EXPIRED
+        const userStore = useUserStore()
+        userStore.logout()
+        router.push('/login')
+        ElMessage.error('登录已过期，请重新登录')
+    },
+    10005: () => {  // TOKEN_INVALID
+        const userStore = useUserStore()
+        userStore.logout()
+        router.push('/login')
+        ElMessage.error('登录已失效，请重新登录')
+    }
+}
+
 // 响应拦截器：统一错误处理
 request.interceptors.response.use(
     (response) => {
@@ -34,20 +50,17 @@ request.interceptors.response.use(
         if (res.code === 200) {
             return res.data//只返回data部分
         }
-        // 业务错误（400，401，404）
-        const message=res.message || '请求失败'
-        ElMessage.error(message)
-
-        // 401令牌过期
-        if (res.code === 401){
-            const userStore=useUserStore()
-            userStore.logout()
-            router.push("/login")
+        // 业务错误
+        const handler = ERROR_HANDLERS[res.code]
+        if (handler) {
+            handler(res)
+        } else {
+            ElMessage.error(res.message || '请求失败')
         }
 
         return Promise.reject({
             code:res.code,
-            message:message,
+            message:res.message,
             data:res.data
         })
     },

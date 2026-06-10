@@ -19,7 +19,6 @@ public class NoteEntity {
     private String content;
     private String summary;
 
-    @TableField("is_deleted")
     private Integer isDeleted;
 
     private LocalDateTime deletedAt;

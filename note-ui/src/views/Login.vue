@@ -272,7 +272,7 @@ const handleLogin = async () => {
     await formRef.value.validate()
     loading.value = true
 
-    const res = await request.post('/ums/login', {
+    const res = await request.post('/user/login', {
       username: form.username,
       password: form.password
     })

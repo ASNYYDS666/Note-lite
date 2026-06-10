@@ -91,7 +91,7 @@ const handleRegister = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        const res = await request.post('/ums/register', {
+        const res = await request.post('/user/register', {
           username: registerForm.username,
           email: registerForm.email,
           password: registerForm.password

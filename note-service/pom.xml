@@ -51,6 +51,12 @@
 			<version>${knife4j.version}</version>
 		</dependency>
 
+		<!-- Flyway（数据库迁移管理） -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-mysql</artifactId>
+		</dependency>
+
 		<!-- MySQL -->
 		<dependency>
 			<groupId>com.mysql</groupId>

@@ -1,6 +1,7 @@
 //day03
 package com.note.service.common.vo;
 
+import com.note.service.common.exception.ErrorCode;
 import lombok.Data;
 
 //建立统一响应类
@@ -24,7 +25,7 @@ public class Result<T> {
 
     public static <T> Result<T> error(String message) {
         Result<T> result = new Result<>();
-        result.setCode(500);
+        result.setCode(ErrorCode.SYSTEM_ERROR.getCode());
         result.setMessage(message);
         return result;
     }

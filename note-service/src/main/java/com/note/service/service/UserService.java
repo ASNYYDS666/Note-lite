@@ -34,6 +34,7 @@ package com.note.service.service;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.note.service.common.exception.BusinessException;
+import com.note.service.common.exception.ErrorCode;
 import com.note.service.dto.LoginDTO;
 import com.note.service.dto.UserRegisterDTO;
 import com.note.service.entity.UserEntity;
@@ -51,12 +52,12 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
     public void register(UserRegisterDTO dto) {
         // 检查用户名
         if (lambdaQuery().eq(UserEntity::getUsername, dto.getUsername()).count() > 0) {
-            throw new BusinessException(400, "用户名已存在");
+            throw new BusinessException(ErrorCode.USERNAME_EXISTS);
         }
 
         // 检查邮箱
         if (lambdaQuery().eq(UserEntity::getEmail, dto.getEmail()).count() > 0) {
-            throw new BusinessException(400, "邮箱已被注册");
+            throw new BusinessException(ErrorCode.EMAIL_EXISTS);
         }
 
         // 创建用户（密码加密）
@@ -74,7 +75,7 @@ public class UserService extends ServiceImpl<UserMapper, UserEntity> {
                 .one();
 
         if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-            throw new BusinessException(400, "用户名或密码错误");
+            throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
 
         return user;

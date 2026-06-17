@@ -25,6 +25,16 @@ spring:
 jwt:
   secret: dev-secret-key-note-lite-local-only
 
+# RAG 开发环境配置
+qdrant:
+  host: localhost
+  port: 6334
+  collection: note_chunks
+  vector-size: 1536
+
+ai:
+  aes-key: dev-aes-key-note-lite-local-only
+
 logging:
   level:
     com.note.service: DEBUG

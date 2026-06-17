@@ -28,6 +28,16 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+# RAG 生产环境配置
+qdrant:
+  host: ${QDRANT_HOST}
+  port: ${QDRANT_PORT:6334}
+  collection: note_chunks
+  vector-size: 1536
+
+ai:
+  aes-key: ${AI_AES_KEY}
+
 logging:
   level:
     com.note.service: INFO

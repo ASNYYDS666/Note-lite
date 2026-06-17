@@ -5,17 +5,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.support.WebExchangeBindException;
 
 //全局异常处理
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 处理参数校验异常（@Valid 失败）
+    // 处理参数校验异常（@Valid 失败 — Spring MVC）
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<String> handleValidationException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
         log.warn("参数校验失败: {}", message);
+        return Result.error(ErrorCode.PARAM_VALIDATION_FAILED.getCode(), message);
+    }
+
+    // 处理参数校验异常（@Valid 失败 — Spring WebFlux / SSE 接口）
+    @ExceptionHandler(WebExchangeBindException.class)
+    public Result<String> handleWebExchangeBindException(WebExchangeBindException e) {
+        String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        log.warn("参数校验失败(WebFlux): {}", message);
         return Result.error(ErrorCode.PARAM_VALIDATION_FAILED.getCode(), message);
     }
 

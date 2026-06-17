@@ -12,6 +12,15 @@ spring:
 
 mybatis-plus:
 
+# RAG 检索参数
+note:
+  chunk:
+    size: 500
+    overlap: 100
+  retrieval:
+    top-k: 5
+    score-threshold: 0.3
+
 jwt:
   expiration: ${JWT_EXPIRATION:86400000}
 

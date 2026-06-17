@@ -3,6 +3,7 @@ package com.note.service.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.note.service.ai.NoteEmbeddingEvent;
 import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
@@ -56,6 +57,8 @@ class NoteServiceTest {
     private ValueOperations<String, String> valueOperations;
     @Mock
     private MicrometerMetrics metrics;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private NoteService noteService;
@@ -63,7 +66,7 @@ class NoteServiceTest {
     @BeforeEach
     void setUp() {
         noteService = new NoteService(noteTagMapper, shareMapper, stringRedisTemplate,
-                objectMapper, metrics);
+                objectMapper, metrics, eventPublisher);
         ReflectionTestUtils.setField(noteService, "baseMapper", noteMapper);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(metrics.recordQuery(any())).thenAnswer(invocation -> {

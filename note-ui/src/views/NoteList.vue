@@ -284,6 +284,13 @@
             :all-tags="allTags"
             @change="handleTagFilter"
         />
+        <button class="ai-btn" @click="showAIPanel = !showAIPanel" :class="{ active: showAIPanel }">
+          <svg viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 8h.01M10 8h.01M14 8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          AI 对话
+        </button>
         <button class="new-btn" @click="createNote">
           <el-icon><Plus /></el-icon>
           新建笔记
@@ -393,6 +400,12 @@
           @current-change="loadNotes"
       />
     </div>
+
+    <AIChatPanel
+        :visible="showAIPanel"
+        @close="showAIPanel = false"
+        @navigate="handleAINavigate"
+    />
   </div>
 </template>
 
@@ -403,6 +416,7 @@ import { Plus, Delete, Search, Share} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import TagFilter from '@/components/TagFilter.vue'
+import AIChatPanel from '@/components/AIChatPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -416,6 +430,7 @@ const selectedTags = ref([])
 const tagMatch = ref('ANY')
 const allTags = ref([])
 const keyword = ref('')
+const showAIPanel = ref(false)
 
 // 根据标签给卡片赋予不同的左边框色调，循环用
 const accentColors = ['accent-purple', 'accent-teal', 'accent-amber', 'accent-coral', 'accent-blue']
@@ -449,6 +464,7 @@ const loadNotes = async () => {
 
 const createNote = () => router.push('/note/new')
 const editNote = (id) => router.push(`/note/${id}`)
+const handleAINavigate = (noteId) => router.push(`/note/${noteId}`)
 
 const formatTime = (time) => {
   if (!time) return ''
@@ -584,6 +600,39 @@ onMounted(() => {
 
 .search-input::placeholder {
   color: #c0bdd4;
+}
+
+/* AI 对话按钮 */
+.ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid #e8e6f0;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b5ce7;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.ai-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ai-btn:hover {
+  background: #f5f3ff;
+  border-color: #c8c5e8;
+}
+
+.ai-btn.active {
+  background: #6b5ce7;
+  border-color: #6b5ce7;
+  color: white;
 }
 
 /* 新建按钮 */

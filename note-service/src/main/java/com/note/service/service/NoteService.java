@@ -3,6 +3,7 @@ package com.note.service.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.note.service.ai.NoteEmbeddingEvent;
 import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
@@ -18,6 +19,7 @@ import com.note.service.mapper.NoteTagMapper;
 import com.note.service.mapper.ShareMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -46,6 +48,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
     private final StringRedisTemplate stringRedisTemplate;  // 通过构造器注入
     private final ObjectMapper objectMapper;
     private final MicrometerMetrics metrics; //day08新增监控指标工具
+    private final ApplicationEventPublisher eventPublisher;
 
     // ========== 核心 CRUD ==========
 
@@ -67,6 +70,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         }
 
         log.info("创建笔记成功: userId={}, noteId={}", userId, note.getId());
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(note.getId(), NoteEmbeddingEvent.EventType.CREATED));
         return note.getId();
     }
 
@@ -162,6 +166,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
         // 清除缓存
         clearNoteCache(noteId, userId);
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.UPDATED));
         log.info("更新笔记成功，已清除缓存: noteId={}", noteId);
     }
 
@@ -177,12 +182,14 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             baseMapper.deleteById(noteId);
             noteTagMapper.delete(new QueryWrapper<NoteTagEntity>().eq("note_id", noteId));
             shareMapper.delete(new QueryWrapper<ShareEntity>().eq("note_id", noteId));
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.DELETED));
             log.info("物理删除笔记: noteId={}", noteId);
         } else {
             // 软删除（移入回收站）
             note.setIsDeleted(1);
             note.setDeletedAt(LocalDateTime.now());
             baseMapper.updateById(note);
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.DELETED));
             log.info("移入回收站: noteId={}", noteId);
         }
         // 新增无论是软删除还是物理删除都需要清除缓存
@@ -388,6 +395,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         note.setDeletedAt(null);
         baseMapper.updateById(note);
         clearNoteCache(noteId, userId);
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.UPDATED));
         log.info("恢复笔记，已清除缓存: noteId={}", noteId);
     }
 
@@ -407,6 +415,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             shareMapper.delete(new QueryWrapper<ShareEntity>().eq("note_id", note.getId()));
             // 清除缓存
             clearNoteCache(note.getId(), userId);
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(note.getId(), NoteEmbeddingEvent.EventType.DELETED));
         }
         log.info("清空回收站: userId={}, count={}", userId, recycleNotes.size());
     }

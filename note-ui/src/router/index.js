@@ -31,6 +31,12 @@ const routes = [
                 component: ()=> import('@/views/RecycleBin.vue')
             },
             {
+                path: 'ai-settings',
+                name: 'AISettings',
+                component: () => import('@/views/AISettings.vue'),
+                meta: { title: 'AI 设置' }
+            },
+            {
                 path: 'note/new',
                 name: 'NoteCreate',
                 component: () => import('@/views/NoteEdit.vue')

@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.vo.Result;
 import com.note.service.common.vo.NoteDetailVO;
+import com.note.service.common.vo.NoteTreeVO;
 import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
+import com.note.service.service.NoteFolderService;
 import com.note.service.service.NoteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,8 +37,9 @@ public class NoteController {
 
 
     private final NoteService noteService;
+    private final NoteFolderService noteFolderService;
     private final StringRedisTemplate stringRedisTemplate;
-    private final ObjectMapper objectMapper;            // Spring Boot 自动注册，直接注入即可
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     @Operation(summary = "创建笔记")
@@ -175,6 +178,61 @@ public class NoteController {
         String key = buildDraftKey(userId, noteId);
         Boolean deleted = stringRedisTemplate.delete(key);
         log.debug("草稿已清除: key={}, existed={}", key, deleted);
+        return Result.success();
+    }
+
+    // ==================== 文件夹+笔记树接口 ====================
+
+    @GetMapping("/tree")
+    @Operation(summary = "获取文件夹+笔记树（驱动前端目录树）")
+    public Result<NoteTreeVO> getNoteTree(@AuthenticationPrincipal Long userId) {
+        return Result.success(noteService.getNoteTree(userId));
+    }
+
+    @PutMapping("/{id}/move")
+    @Operation(summary = "移动笔记到指定文件夹")
+    public Result<Void> moveNote(@Parameter(description = "笔记ID") @PathVariable Long id,
+                                  @Parameter(description = "目标文件夹ID，null表示根目录") @RequestParam(required = false) Long folderId,
+                                  @AuthenticationPrincipal Long userId) {
+        noteService.moveNote(id, userId, folderId);
+        return Result.success();
+    }
+
+    @PutMapping("/{id}/rename")
+    @Operation(summary = "重命名笔记（仅更新标题）")
+    public Result<Void> renameNote(@Parameter(description = "笔记ID") @PathVariable Long id,
+                                    @Parameter(description = "新标题") @RequestParam String title,
+                                    @AuthenticationPrincipal Long userId) {
+        noteService.renameNote(id, userId, title);
+        return Result.success();
+    }
+
+    // ==================== 文件夹CRUD接口 ====================
+
+    @PostMapping("/folder")
+    @Operation(summary = "创建文件夹")
+    public Result<Long> createFolder(@Parameter(description = "父文件夹ID，null表示根目录") @RequestParam(required = false) Long parentId,
+                                     @Parameter(description = "文件夹名称") @RequestParam String name,
+                                     @AuthenticationPrincipal Long userId) {
+        Long folderId = noteFolderService.createFolder(userId, parentId, name);
+        return Result.success(folderId);
+    }
+
+    @PutMapping("/folder/{id}")
+    @Operation(summary = "重命名或移动文件夹")
+    public Result<Void> updateFolder(@Parameter(description = "文件夹ID") @PathVariable Long id,
+                                      @Parameter(description = "新名称(可选)") @RequestParam(required = false) String name,
+                                      @Parameter(description = "目标父文件夹ID(可选)") @RequestParam(required = false) Long parentId,
+                                      @AuthenticationPrincipal Long userId) {
+        noteFolderService.updateFolder(userId, id, name, parentId);
+        return Result.success();
+    }
+
+    @DeleteMapping("/folder/{id}")
+    @Operation(summary = "删除文件夹（内部笔记移入回收站）")
+    public Result<Void> deleteFolder(@Parameter(description = "文件夹ID") @PathVariable Long id,
+                                      @AuthenticationPrincipal Long userId) {
+        noteFolderService.deleteFolder(userId, id);
         return Result.success();
     }
 }

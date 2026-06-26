@@ -27,6 +27,10 @@
             <el-icon><Plus /></el-icon>
             <span>新建笔记</span>
           </el-menu-item>
+          <el-menu-item index="/ai-settings">
+            <el-icon><Setting /></el-icon>
+            <span>AI 设置</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -40,7 +44,7 @@
 <script setup>
 import { useUserStore } from '@/store/user'
 import { useRouter } from 'vue-router'
-import { Document, Plus , Delete} from '@element-plus/icons-vue'
+import { Document, Plus, Delete, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 

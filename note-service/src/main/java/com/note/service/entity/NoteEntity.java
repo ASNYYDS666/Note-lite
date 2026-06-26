@@ -19,6 +19,7 @@ public class NoteEntity {
     private String content;
     private String summary;
 
+    private Long folderId;
     private Integer isDeleted;
 
     private LocalDateTime deletedAt;

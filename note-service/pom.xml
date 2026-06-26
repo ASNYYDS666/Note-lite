@@ -31,6 +31,12 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+		<!-- WebFlux 响应式 HTTP 客户端（调用 Embedding/Chat API） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
 		<!-- Validation -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -79,10 +85,22 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- AOP 支持（Day 8 新增） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+		</dependency>
+
 		<!-- 测试（修正artifactId） -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 
@@ -121,6 +139,19 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-pool2</artifactId>
+		</dependency>
+
+		<!-- Caffeine 本地缓存（检索结果缓存） -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
+		<!-- Mustache 模板引擎（Prompt 模板渲染） -->
+		<dependency>
+			<groupId>com.samskivert</groupId>
+			<artifactId>jmustache</artifactId>
+			<version>1.16</version>
 		</dependency>
 
 		<!-- Micrometer Prometheus 注册器（自动将指标暴露为 Prometheus 格式） -->

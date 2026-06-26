@@ -21,6 +21,9 @@ public class NoteDTO {
     @Schema(description = "笔记正文，Markdown 格式", example = "# 学习笔记\n今天学了...")
     private String content;
 
+    @Schema(description = "所属文件夹ID，null表示根目录")
+    private Long folderId;
+
     @Size(max = 10, message = "最多10个标签")
     @Schema(description = "标签列表，最多10个", example = "[\"java\", \"spring\"]")
     private List<String> tags;

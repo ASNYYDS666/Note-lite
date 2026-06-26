@@ -80,4 +80,7 @@ public interface NoteMapper extends BaseMapper<NoteEntity> {
                        @Param("tags") List<String> tags,
                        @Param("tagMatch") String tagMatch);
 
+    @Select("SELECT id, title, folder_id, updated_at FROM note WHERE user_id = #{userId} AND is_deleted = 0 ORDER BY updated_at DESC")
+    List<NoteEntity> selectActiveByUserId(@Param("userId") Long userId);
+
 }

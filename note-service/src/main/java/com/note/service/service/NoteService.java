@@ -3,21 +3,26 @@ package com.note.service.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.note.service.ai.NoteEmbeddingEvent;
 import com.note.service.common.constant.CacheConstants;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
 import com.note.service.common.metrics.MicrometerMetrics;
 import com.note.service.common.vo.NoteDetailVO;
+import com.note.service.common.vo.NoteTreeVO;
 import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
 import com.note.service.entity.NoteEntity;
+import com.note.service.entity.NoteFolderEntity;
 import com.note.service.entity.NoteTagEntity;
 import com.note.service.entity.ShareEntity;
 import com.note.service.mapper.NoteMapper;
+import com.note.service.mapper.NoteFolderMapper;
 import com.note.service.mapper.NoteTagMapper;
 import com.note.service.mapper.ShareMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -41,11 +46,13 @@ import java.util.concurrent.TimeUnit;
 public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
     private final NoteTagMapper noteTagMapper;
+    private final NoteFolderMapper noteFolderMapper;
     private final ShareMapper shareMapper;
 
     private final StringRedisTemplate stringRedisTemplate;  // 通过构造器注入
     private final ObjectMapper objectMapper;
     private final MicrometerMetrics metrics; //day08新增监控指标工具
+    private final ApplicationEventPublisher eventPublisher;
 
     // ========== 核心 CRUD ==========
 
@@ -57,6 +64,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         note.setTitle(dto.getTitle().trim());
         note.setContent(dto.getContent());
         note.setSummary(generateSummary(dto.getContent()));
+        note.setFolderId(dto.getFolderId());
         note.setIsDeleted(0);
 
         baseMapper.insert(note);
@@ -67,6 +75,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         }
 
         log.info("创建笔记成功: userId={}, noteId={}", userId, note.getId());
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(note.getId(), NoteEmbeddingEvent.EventType.CREATED));
         return note.getId();
     }
 
@@ -148,10 +157,15 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         // 1. 校验权限
         NoteEntity exist = getDetail(noteId, userId);  // 会抛异常如果无权限
 
-        // 2. 更新主表
+        // 2. 更新主表（仅更新非 null 字段，支持部分更新如内联重命名）
         exist.setTitle(dto.getTitle().trim());
-        exist.setContent(dto.getContent());
-        exist.setSummary(generateSummary(dto.getContent()));
+        if (dto.getContent() != null) {
+            exist.setContent(dto.getContent());
+            exist.setSummary(generateSummary(dto.getContent()));
+        }
+        if (dto.getFolderId() != null) {
+            exist.setFolderId(dto.getFolderId());
+        }
         baseMapper.updateById(exist);
 
         // 3. 更新标签：先删后插（简单策略）
@@ -162,6 +176,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
         // 清除缓存
         clearNoteCache(noteId, userId);
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.UPDATED));
         log.info("更新笔记成功，已清除缓存: noteId={}", noteId);
     }
 
@@ -177,12 +192,14 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             baseMapper.deleteById(noteId);
             noteTagMapper.delete(new QueryWrapper<NoteTagEntity>().eq("note_id", noteId));
             shareMapper.delete(new QueryWrapper<ShareEntity>().eq("note_id", noteId));
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.DELETED));
             log.info("物理删除笔记: noteId={}", noteId);
         } else {
             // 软删除（移入回收站）
             note.setIsDeleted(1);
             note.setDeletedAt(LocalDateTime.now());
             baseMapper.updateById(note);
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.DELETED));
             log.info("移入回收站: noteId={}", noteId);
         }
         // 新增无论是软删除还是物理删除都需要清除缓存
@@ -318,6 +335,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         vo.setTitle(entity.getTitle());
         vo.setContent(entity.getContent());
         vo.setSummary(entity.getSummary());
+        vo.setFolderId(entity.getFolderId());
         vo.setTags(entity.getTags());
         vo.setCreatedAt(entity.getCreatedAt());
         vo.setUpdatedAt(entity.getUpdatedAt());
@@ -388,6 +406,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
         note.setDeletedAt(null);
         baseMapper.updateById(note);
         clearNoteCache(noteId, userId);
+        eventPublisher.publishEvent(new NoteEmbeddingEvent(noteId, NoteEmbeddingEvent.EventType.UPDATED));
         log.info("恢复笔记，已清除缓存: noteId={}", noteId);
     }
 
@@ -407,6 +426,7 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             shareMapper.delete(new QueryWrapper<ShareEntity>().eq("note_id", note.getId()));
             // 清除缓存
             clearNoteCache(note.getId(), userId);
+            eventPublisher.publishEvent(new NoteEmbeddingEvent(note.getId(), NoteEmbeddingEvent.EventType.DELETED));
         }
         log.info("清空回收站: userId={}, count={}", userId, recycleNotes.size());
     }
@@ -509,6 +529,68 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
             log.error("分享-序列化笔记失败，noteId={}", noteId, e);
         }
         return note;
+    }
+
+    /**
+     * 暴露给 NoteFolderService 等，在跨服务软删除笔记时清除缓存
+     */
+    public void invalidateNoteCache(Long noteId, Long userId) {
+        clearNoteCache(noteId, userId);
+    }
+
+    // ==================== 文件夹+笔记树查询 ====================
+
+    /**
+     * 获取用户的文件夹+笔记树（供前端目录树使用）
+     */
+    public NoteTreeVO getNoteTree(Long userId) {
+        List<NoteFolderEntity> folders = noteFolderMapper.selectByUserId(userId);
+        List<NoteEntity> notes = baseMapper.selectActiveByUserId(userId);
+        return NoteTreeVO.build(folders, notes);
+    }
+
+    // ==================== 移动笔记 ====================
+
+    /**
+     * 移动笔记到指定文件夹
+     */
+    @Transactional
+    public void moveNote(Long noteId, Long userId, Long folderId) {
+        NoteEntity note = baseMapper.selectById(noteId);
+        if (note == null || !note.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOTE_NO_PERMISSION);
+        }
+        if (note.getIsDeleted() == 1) {
+            throw new BusinessException(ErrorCode.NOTE_IN_RECYCLE);
+        }
+
+        // 校验目标文件夹存在（如果非根目录）
+        if (folderId != null) {
+            NoteFolderEntity folder = noteFolderMapper.selectById(folderId);
+            if (folder == null || !folder.getUserId().equals(userId)) {
+                throw new BusinessException(ErrorCode.FOLDER_NOT_FOUND);
+            }
+        }
+
+        note.setFolderId(folderId);
+        baseMapper.updateById(note);
+        clearNoteCache(noteId, userId);
+        log.info("移动笔记: noteId={}, targetFolderId={}", noteId, folderId);
+    }
+
+    @Transactional
+    public void renameNote(Long noteId, Long userId, String title) {
+        NoteEntity note = baseMapper.selectById(noteId);
+        if (note == null || !note.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOTE_NO_PERMISSION);
+        }
+        if (note.getIsDeleted() == 1) {
+            throw new BusinessException(ErrorCode.NOTE_IN_RECYCLE);
+        }
+        note.setTitle(title.trim());
+        baseMapper.updateById(note);
+        clearNoteCache(noteId, userId);
+        log.info("重命名笔记: noteId={}, title={}", noteId, title);
     }
 
 }

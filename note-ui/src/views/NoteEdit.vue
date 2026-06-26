@@ -237,6 +237,19 @@
       </div>
 
       <button
+          class="ai-toggle-btn"
+          :class="{ active: showAIPanel }"
+          @click="showAIPanel = !showAIPanel"
+          title="AI 对话"
+      >
+        <svg viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6 8h.01M10 8h.01M14 8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        AI
+      </button>
+
+      <button
           class="save-btn"
           :class="{ loading: saving }"
           :disabled="saving"
@@ -273,6 +286,13 @@
         @save="handleSave"
     />
 
+    <AIChatPanel
+        :visible="showAIPanel"
+        :note-id="noteId"
+        @close="showAIPanel = false"
+        @navigate="handleAINavigate"
+    />
+
   </div>
 </template>
 
@@ -282,6 +302,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import AIChatPanel from '@/components/AIChatPanel.vue'
 import { debounce } from 'lodash-es'
 
 const route = useRoute()
@@ -291,6 +312,7 @@ const noteId = ref(route.params.id ? Number(route.params.id) : null)
 const title = ref('')
 const content = ref('')
 const saving = ref(false)
+const showAIPanel = ref(false)
 const draftStatus = ref('') // '' | 'saving' | 'saved'
 
 let draftHideTimer = null
@@ -314,6 +336,13 @@ onMounted(async () => {
 // 返回按钮
 const handleBack = () => {
   router.push('/')
+}
+
+// AI 面板跳转到引用的笔记
+const handleAINavigate = (targetNoteId) => {
+  if (targetNoteId && targetNoteId !== noteId.value) {
+    router.push(`/note/${targetNoteId}`)
+  }
 }
 
 // 保存
@@ -529,6 +558,37 @@ onUnmounted(() => {
   cursor: pointer;
   transition: opacity 0.15s, transform 0.15s;
   flex-shrink: 0;
+}
+
+.ai-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: white;
+  border: 1px solid #e8e6f0;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #6b5ce7;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.ai-toggle-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ai-toggle-btn:hover {
+  background: #f5f3ff;
+  border-color: #c8c5e8;
+}
+
+.ai-toggle-btn.active {
+  background: #6b5ce7;
+  border-color: #6b5ce7;
+  color: white;
 }
 
 .save-btn svg {

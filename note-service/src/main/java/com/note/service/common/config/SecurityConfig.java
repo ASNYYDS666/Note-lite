@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;  // 添加这行！
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -15,6 +15,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import jakarta.servlet.DispatcherType;
 
 @RequiredArgsConstructor
 @Configuration
@@ -41,6 +43,8 @@ public class SecurityConfig {
 
                 // 配置授权规则
                 .authorizeHttpRequests(auth -> auth
+                        // ASYNC/ERROR 分发由原始请求的认证结果决定，无需再次验证
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/v1/user/register", "/api/v1/user/login").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/share").authenticated()

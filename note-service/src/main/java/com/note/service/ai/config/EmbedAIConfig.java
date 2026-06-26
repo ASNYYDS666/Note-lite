@@ -11,4 +11,5 @@ public class EmbedAIConfig {
     private String apiKey;
     private String model;
     private String baseUrl;
+    private String pluginType;
 }

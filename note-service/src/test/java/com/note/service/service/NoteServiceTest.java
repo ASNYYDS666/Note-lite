@@ -13,6 +13,7 @@ import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
 import com.note.service.entity.NoteEntity;
 import com.note.service.entity.NoteTagEntity;
+import com.note.service.mapper.NoteFolderMapper;
 import com.note.service.mapper.NoteMapper;
 import com.note.service.mapper.NoteTagMapper;
 import com.note.service.mapper.ShareMapper;
@@ -50,6 +51,8 @@ class NoteServiceTest {
     @Mock
     private NoteTagMapper noteTagMapper;
     @Mock
+    private NoteFolderMapper noteFolderMapper;
+    @Mock
     private ShareMapper shareMapper;
     @Mock
     private StringRedisTemplate stringRedisTemplate;
@@ -65,8 +68,8 @@ class NoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        noteService = new NoteService(noteTagMapper, shareMapper, stringRedisTemplate,
-                objectMapper, metrics, eventPublisher);
+        noteService = new NoteService(noteTagMapper, noteFolderMapper, shareMapper,
+                stringRedisTemplate, objectMapper, metrics, eventPublisher);
         ReflectionTestUtils.setField(noteService, "baseMapper", noteMapper);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(metrics.recordQuery(any())).thenAnswer(invocation -> {

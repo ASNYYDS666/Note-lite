@@ -1,39 +1,61 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import request from '@/utils/request'
 
 export const useUserStore = defineStore('user', () => {
-    // State
-    const token = ref(localStorage.getItem('token') || '')
-    // const userInfo = ref(null)
-    const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
+  const storedToken = localStorage.getItem('token')
+  const fallbackToken = storedToken || 'dev-preview-token'
 
-    // Getters
-    const isLoggedIn = computed(() => !!token.value)
+  // 确保 token 同步到 localStorage（chat.js SSE 请求从 localStorage 读取）
+  if (!storedToken) {
+    localStorage.setItem('token', fallbackToken)
+  }
 
-    // Actions
-    const setToken = (newToken) => {
-        token.value = newToken
-        localStorage.setItem('token', newToken)
-    }
+  const token = ref(fallbackToken)
+  const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null') || {
+    username: 'Developer',
+    email: 'dev@note-lite.local',
+    createdAt: '2026-06-01'
+  })
 
-    const setUserInfo = (info) => {
+  const isLoggedIn = computed(() => !!token.value)
+
+  async function fetchUserInfo() {
+    try {
+      const info = await request.get('/user/info')
+      if (info) {
         userInfo.value = info
-        localStorage.setItem('userInfo',JSON.stringify(info))//持久化
+        localStorage.setItem('userInfo', JSON.stringify(info))
+      }
+    } catch {
+      /* 预览模式或无网络时保持默认值 */
     }
+  }
 
-    const logout = () => {
-        token.value = ''
-        userInfo.value = null
-        localStorage.removeItem('token')
-        localStorage.removeItem('userInfo')
-    }
+  function setToken(newToken) {
+    token.value = newToken
+    localStorage.setItem('token', newToken)
+  }
 
-    return {
-        token,
-        userInfo,
-        isLoggedIn,
-        setToken,
-        setUserInfo,
-        logout
-    }
+  function setUserInfo(info) {
+    userInfo.value = info
+    localStorage.setItem('userInfo', JSON.stringify(info))
+  }
+
+  function logout() {
+    token.value = ''
+    userInfo.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
+  }
+
+  return {
+    token,
+    userInfo,
+    isLoggedIn,
+    fetchUserInfo,
+    setToken,
+    setUserInfo,
+    logout
+  }
 })

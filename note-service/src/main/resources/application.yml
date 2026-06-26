@@ -20,6 +20,12 @@ note:
   retrieval:
     top-k: 5
     score-threshold: 0.3
+    max-chunks: 6
+    max-chars: 8000
+
+  conversation:
+    max-history-rounds: 5
+    max-history-hours: 24
 
 jwt:
   expiration: ${JWT_EXPIRATION:86400000}

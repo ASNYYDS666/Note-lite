@@ -54,7 +54,7 @@ request.interceptors.response.use(
         const handler = ERROR_HANDLERS[res.code]
         if (handler) {
             handler(res)
-        } else {
+        } else if (!response.config.silent) {
             ElMessage.error(res.message || '请求失败')
         }
 
@@ -68,16 +68,20 @@ request.interceptors.response.use(
         const { response } = error
         if (!response) {
             // 网络完全断开，只弹一次
-            ElMessage.error({ message: '网络连接失败，请检查后端服务', grouping: true })
+            if (!error.config?.silent) {
+                ElMessage.error({ message: '网络连接失败，请检查后端服务', grouping: true })
+            }
             return Promise.reject(error)
         }
 
         if (response?.status === 401 || response?.status=== 403) {
-            ElMessage.error('登录已过期，请重新登录')
+            if (!error.config?.silent) {
+                ElMessage.error('登录已过期，请重新登录')
+            }
             const userStore = useUserStore()
             userStore.logout()
             router.push('/login')
-        } else {
+        } else if (!error.config?.silent) {
             ElMessage.error({ message: response?.data?.message || '请求失败', grouping: true })
         }
 

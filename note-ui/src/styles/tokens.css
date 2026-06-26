@@ -1,0 +1,301 @@
+/* ===== Note-lite Design Tokens (Light Mode) ===== */
+/* Source: Stitch Studio Narrative Design System */
+
+:root {
+  /* Surface Colors */
+  --bg: #faf9f7;
+  --surface: #faf9f7;
+  --surface-dim: #dadad8;
+  --surface-bright: #faf9f7;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f4f3f1;
+  --surface-container: #efeeec;
+  --surface-container-high: #e9e8e6;
+  --surface-container-highest: #e3e2e0;
+  --surface-dark: #1e2120;
+  --surface-tint: #5d5f5b;
+
+  /* Primary */
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --primary-container: #1a1c19;
+  --on-primary-container: #838480;
+  --primary-fixed: #e2e3de;
+  --primary-fixed-dim: #c6c7c2;
+  --on-primary-fixed: #1a1c19;
+  --on-primary-fixed-variant: #454744;
+  --inverse-primary: #c6c7c2;
+
+  /* Secondary / Accent */
+  --secondary: #546253;
+  --on-secondary: #ffffff;
+  --secondary-container: #d4e4d1;
+  --on-secondary-container: #586657;
+  --secondary-fixed: #d7e7d4;
+  --secondary-fixed-dim: #bbcbb8;
+  --on-secondary-fixed: #121f13;
+  --on-secondary-fixed-variant: #3c4a3c;
+
+  /* Accent Sage */
+  --accent-sage: #6b7a6a;
+  --accent-sage-dark: #8fa88e;
+  --accent-soft: rgba(107, 122, 106, 0.08);
+
+  /* Tertiary */
+  --tertiary: #000000;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #1b1c1b;
+  --on-tertiary-container: #848482;
+  --tertiary-fixed: #e3e2e0;
+  --tertiary-fixed-dim: #c7c6c5;
+  --on-tertiary-fixed: #1b1c1b;
+  --on-tertiary-fixed-variant: #464746;
+
+  /* Text */
+  --on-surface: #1a1c1b;
+  --on-surface-variant: #454843;
+  --on-background: #1a1c1b;
+  --inverse-on-surface: #f1f1ef;
+  --inverse-surface: #2f3130;
+
+  /* Outline */
+  --outline: #757873;
+  --outline-variant: #c5c7c1;
+  --border-default: rgba(199, 199, 191, 0.7);
+  --border-subtle: rgba(199, 199, 191, 0.5);
+
+  /* Status */
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+  --error-red: #c44444;
+  --success-green: #4caf50;
+
+  /* Typography */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-editor: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-code: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+
+  --text-headline-lg: 32px;
+  --text-headline-md: 24px;
+  --text-ui-base: 13.1px;
+  --text-ui-sm: 12.5px;
+  --text-ui-label: 11.5px;
+  --text-status-bar: 11.2px;
+  --text-editor-body: 18px;
+
+  /* Spacing */
+  --top-bar-height: 38px;
+  --icon-rail-width: 48px;
+  --sidebar-width: 220px;
+  --ai-panel-width: 360px;
+  --status-bar-height: 24px;
+  --gutter-md: 8px;
+  --internal-padding: 5.6px;
+  --container-margin: 16px;
+
+  /* Border Radius */
+  --radius-sm: 0.125rem;   /* 2px */
+  --radius-default: 0.25rem; /* 4px */
+  --radius-md: 0.375rem;   /* 6px */
+  --radius-lg: 0.5rem;     /* 8px */
+  --radius-xl: 0.75rem;    /* 12px */
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* ===== Element Plus 主题变量全覆盖 ===== */
+  --el-color-primary: var(--accent-sage);
+  --el-color-primary-light-3: rgba(107, 122, 106, 0.3);
+  --el-color-primary-light-5: rgba(107, 122, 106, 0.5);
+  --el-color-primary-light-7: rgba(107, 122, 106, 0.7);
+  --el-color-primary-light-9: rgba(107, 122, 106, 0.9);
+  --el-color-primary-dark-2: #586657;
+  --el-color-success: var(--success-green);
+  --el-color-warning: #e6a700;
+  --el-color-danger: var(--error-red);
+  --el-color-error: var(--error-red);
+  --el-color-info: #757873;
+
+  --el-bg-color: var(--bg);
+  --el-bg-color-page: var(--surface-container-low);
+  --el-bg-color-overlay: var(--surface-container-lowest);
+  --el-border-color: var(--border-default);
+  --el-border-color-light: var(--border-subtle);
+  --el-border-color-lighter: rgba(199, 199, 191, 0.3);
+  --el-text-color-primary: var(--on-surface);
+  --el-text-color-regular: var(--on-surface-variant);
+  --el-text-color-secondary: var(--outline);
+  --el-text-color-placeholder: var(--outline);
+
+  --el-font-family: var(--font-ui);
+  --el-font-size-base: var(--text-ui-base);
+  --el-font-size-small: var(--text-ui-sm);
+  --el-font-size-large: var(--text-headline-md);
+  --el-font-weight-primary: 400;
+
+  --el-border-radius-base: var(--radius-default);
+  --el-border-radius-small: var(--radius-sm);
+  --el-border-radius-round: var(--radius-full);
+
+  --el-box-shadow-light: var(--shadow-elevated);
+  --el-box-shadow: var(--shadow-dialog);
+
+  --el-disabled-bg-color: var(--surface-container);
+  --el-disabled-border-color: var(--border-subtle);
+  --el-disabled-text-color: var(--outline);
+
+  --el-fill-color: var(--surface-container);
+  --el-fill-color-light: var(--surface-container-low);
+  --el-fill-color-blank: var(--surface-container-lowest);
+
+  /* Element Plus 容器组件尺寸覆盖 */
+  --el-header-padding: 0;
+  --el-header-height: var(--top-bar-height);
+  --el-aside-width: var(--sidebar-width);
+  --el-main-padding: 0;
+  --el-menu-item-height: 32px;
+  --el-menu-item-font-size: var(--text-ui-sm);
+  --el-tabs-header-height: 36px;
+
+  /* Element Plus inputs */
+  --el-input-bg-color: var(--surface-container-low);
+  --el-input-border-color: var(--border-default);
+  --el-input-hover-border-color: var(--accent-sage);
+  --el-input-focus-border-color: var(--accent-sage);
+  --el-input-placeholder-color: var(--outline);
+  --el-input-text-color: var(--on-surface);
+
+  /* Element Plus buttons */
+  --el-button-padding-vertical: 5px;
+  --el-button-padding-horizontal: 12px;
+  --el-button-font-size: var(--text-ui-base);
+  --el-button-border-radius: var(--radius-default);
+  --el-button-hover-text-color: var(--on-primary);
+  --el-button-hover-border-color: var(--accent-sage-dark);
+  --el-button-hover-bg-color: var(--accent-sage-dark);
+  --el-button-active-text-color: var(--on-primary);
+  --el-button-active-border-color: var(--secondary);
+
+  /* Element Plus dialogs */
+  --el-dialog-padding-primary: 20px;
+  --el-dialog-border-radius: var(--radius-lg);
+  --el-dialog-bg-color: var(--surface-container-lowest);
+
+  /* Element Plus tree */
+  --el-tree-node-hover-bg-color: var(--surface-container);
+  --el-tree-expand-icon-color: var(--on-surface-variant);
+  --el-tree-text-color: var(--on-surface);
+
+  /* Element Plus scrollbar */
+  --el-scrollbar-bg-color: var(--secondary-fixed);
+  --el-scrollbar-opacity: 0.3;
+
+  /* Element Plus tag */
+  --el-tag-bg-color: var(--surface-container-high);
+  --el-tag-border-color: var(--border-subtle);
+  --el-tag-text-color: var(--on-surface-variant);
+}
+
+/* ===== Dark Mode Overrides ===== */
+/* Source: Stitch Studio Narrative (color-inverted from light) */
+.dark {
+  /* Surface Colors */
+  --bg: #1a1c1b;
+  --surface: #1e2120;
+  --surface-dim: #2f3130;
+  --surface-bright: #2f3130;
+  --surface-container-lowest: #1a1c1b;
+  --surface-container-low: #1e2120;
+  --surface-container: #242726;
+  --surface-container-high: #2a2d2c;
+  --surface-container-highest: #303332;
+  --surface-dark: #111312;
+  --surface-tint: #c6c7c2;
+
+  /* Primary */
+  --primary: #e2e3de;
+  --on-primary: #1a1c19;
+  --primary-container: #454744;
+  --on-primary-container: #e2e3de;
+  --primary-fixed: #e2e3de;
+  --primary-fixed-dim: #c6c7c2;
+  --on-primary-fixed: #1a1c19;
+  --on-primary-fixed-variant: #c6c7c2;
+  --inverse-primary: #000000;
+
+  /* Secondary */
+  --secondary: #bbcbb8;
+  --on-secondary: #121f13;
+  --secondary-container: #3c4a3c;
+  --on-secondary-container: #d7e7d4;
+  --secondary-fixed: #d7e7d4;
+  --secondary-fixed-dim: #bbcbb8;
+  --on-secondary-fixed: #121f13;
+  --on-secondary-fixed-variant: #bbcbb8;
+
+  /* Accent Sage */
+  --accent-sage: #8fa88e;
+  --accent-sage-dark: #6b7a6a;
+  --accent-soft: rgba(143, 168, 142, 0.12);
+
+  /* Tertiary */
+  --tertiary: #e3e2e0;
+  --on-tertiary: #1b1c1b;
+  --tertiary-container: #464746;
+  --on-tertiary-container: #e3e2e0;
+  --tertiary-fixed: #e3e2e0;
+  --tertiary-fixed-dim: #c7c6c5;
+  --on-tertiary-fixed: #1b1c1b;
+  --on-tertiary-fixed-variant: #c7c6c5;
+
+  /* Text */
+  --on-surface: #e3e2e0;
+  --on-surface-variant: #c5c7c1;
+  --on-background: #e3e2e0;
+  --inverse-on-surface: #1a1c1b;
+  --inverse-surface: #e3e2e0;
+
+  /* Outline */
+  --outline: #8b8d88;
+  --outline-variant: #454843;
+  --border-default: rgba(69, 72, 67, 0.7);
+  --border-subtle: rgba(69, 72, 67, 0.5);
+
+  /* Status */
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
+  --error-red: #ffb4ab;
+  --success-green: #7bc67e;
+
+  /* Shadows */
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
+  --shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  /* Element Plus dark mode overrides */
+  --el-color-primary: var(--accent-sage);
+  --el-color-primary-light-3: rgba(143, 168, 142, 0.3);
+  --el-color-primary-light-5: rgba(143, 168, 142, 0.5);
+  --el-color-primary-light-7: rgba(143, 168, 142, 0.7);
+  --el-color-primary-light-9: rgba(143, 168, 142, 0.9);
+  --el-color-primary-dark-2: #a3bca2;
+  --el-bg-color: var(--bg);
+  --el-bg-color-page: var(--surface-container-low);
+  --el-bg-color-overlay: var(--surface-container-lowest);
+  --el-border-color: var(--border-default);
+  --el-border-color-light: var(--border-subtle);
+  --el-text-color-primary: var(--on-surface);
+  --el-text-color-regular: var(--on-surface-variant);
+  --el-input-bg-color: var(--surface-container);
+  --el-disabled-bg-color: var(--surface-container-high);
+  --el-fill-color: var(--surface-container);
+  --el-fill-color-light: var(--surface-container-low);
+  --el-fill-color-blank: var(--surface-container-lowest);
+  --el-dialog-bg-color: var(--surface-container-lowest);
+  --el-tree-node-hover-bg-color: var(--surface-container-high);
+}

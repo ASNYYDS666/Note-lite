@@ -17,6 +17,9 @@ public class NoteDetailVO {
     @Schema(description = "笔记正文，Markdown 格式")
     private String content;
 
+    @Schema(description = "所属文件夹ID")
+    private Long folderId;
+
     @Schema(description = "笔记摘要，从正文自动生成")
     private String summary;
 

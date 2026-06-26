@@ -16,37 +16,9 @@ const routes = [
     },
     {
         path: '/',
-        component: () => import('@/views/Layout.vue'),
-        meta: { requiresAuth: true },
-        children: [
-            {
-                path: '',
-                name: 'NoteList',
-                component: () => import('@/views/NoteList.vue')
-            },
-            {
-                //day05更新路由配置：添加回收站到Layout的子路由中
-                path:'recycle',
-                name:'RecycleBin',
-                component: ()=> import('@/views/RecycleBin.vue')
-            },
-            {
-                path: 'ai-settings',
-                name: 'AISettings',
-                component: () => import('@/views/AISettings.vue'),
-                meta: { title: 'AI 设置' }
-            },
-            {
-                path: 'note/new',
-                name: 'NoteCreate',
-                component: () => import('@/views/NoteEdit.vue')
-            },
-            {
-                path: 'note/:id',
-                name: 'NoteEdit',
-                component: () => import('@/views/NoteEdit.vue')
-            }
-        ]
+        name: 'Workspace',
+        component: () => import('@/views/Workspace.vue'),
+        meta: { requiresAuth: true }
     },
     {
         path: '/share/:code',
@@ -61,18 +33,10 @@ const router = createRouter({
     routes
 })
 
-// 全局路由守卫
+// 全局路由守卫 (开发预览阶段关闭鉴权)
 router.beforeEach((to, from, next) => {
-    const userStore = useUserStore()
-
-    if (to.meta.requiresAuth && !userStore.token) {
-        next('/login')
-    } else if (to.meta.public && userStore.token && (to.path === '/login' || to.path === '/register')) {
-        // 已登录用户访问登录页，跳首页
-        next('/')
-    } else {
-        next()
-    }
+    // TODO: 预览完成后恢复鉴权
+    next()
 })
 
 export default router

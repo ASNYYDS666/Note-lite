@@ -1,4 +1,4 @@
-package com.note.service.ai.facade;
+package com.note.service.ai.facade.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.note.service.ai.facade.VectorDoc;
+import com.note.service.ai.facade.VectorStore;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +22,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class QdrantVectorStore {
+public class QdrantVectorStore implements VectorStore {
 
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
@@ -184,6 +186,28 @@ public class QdrantVectorStore {
             log.debug("Qdrant 删除完成: collection={}, noteId={}", collectionName, noteId);
         } catch (Exception e) {
             log.error("Qdrant 删除异常: collection={}, noteId={}", collectionName, noteId, e);
+            throw new BusinessException(ErrorCode.AI_VECTOR_STORE_ERROR);
+        }
+    }
+
+    // ==================== 通用删除（接口方法） ====================
+
+    @Override
+    public void deleteByFilter(String collectionName, Map<String, Object> filter) {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.set("filter", buildFilter(filter));
+
+        try {
+            client().post()
+                    .uri("/collections/" + collectionName + "/points/delete")
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+            searchCache.invalidateAll();
+            log.debug("Qdrant 删除完成: collection={}, filter={}", collectionName, filter);
+        } catch (Exception e) {
+            log.error("Qdrant 删除异常: collection={}", collectionName, e);
             throw new BusinessException(ErrorCode.AI_VECTOR_STORE_ERROR);
         }
     }

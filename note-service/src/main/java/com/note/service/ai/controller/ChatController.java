@@ -2,6 +2,7 @@ package com.note.service.ai.controller;
 
 import com.note.service.ai.ChatService;
 import com.note.service.dto.ChatRequest;
+import com.note.service.service.ConversationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -9,10 +10,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Tag(name = "AI 对话", description = "RAG 知识库问答")
@@ -22,6 +26,7 @@ import java.io.IOException;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ConversationService conversationService;
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "AI 对话（SSE 流式）")
@@ -30,17 +35,28 @@ public class ChatController {
 
         SseEmitter emitter = new SseEmitter(120_000L);
 
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+
         new Thread(() -> {
+            SecurityContextHolder.setContext(securityContext);
             try {
+                AtomicLong cidHolder = new AtomicLong();
+                String[] qidHolder = new String[1];
+                StringBuilder responseBuffer = new StringBuilder();
+
                 chatService.ask(userId, request.getQuestion(),
-                        request.getScopeType(), request.getScopeIds())
+                        request.getScopeType(), request.getScopeIds(), request.getStyle(),
+                        request.getConversationId(), cidHolder, qidHolder,
+                        request.getProfileId(), request.getModelName())
                         .subscribe(
                                 token -> {
                                     try {
                                         if ("[DONE]".equals(token)) {
                                             emitter.send(SseEmitter.event()
-                                                    .data("{\"done\":true}"));
+                                                    .data("{\"done\":true,\"conversationId\":"
+                                                            + cidHolder.get() + "}"));
                                         } else {
+                                            responseBuffer.append(token);
                                             emitter.send(SseEmitter.event()
                                                     .data("{\"token\":\"" + escapeJson(token)
                                                             + "\",\"done\":false}"));
@@ -59,7 +75,12 @@ public class ChatController {
                                         emitter.completeWithError(e);
                                     }
                                 },
-                                () -> emitter.complete()
+                                () -> {
+                                    // 流完成后保存消息（失败不影响响应）
+                                    saveMessages(cidHolder.get(), qidHolder[0],
+                                            request.getQuestion(), responseBuffer.toString());
+                                    emitter.complete();
+                                }
                         );
             } catch (Exception e) {
                 try {
@@ -69,10 +90,27 @@ public class ChatController {
                 } catch (IOException ex) {
                     emitter.completeWithError(ex);
                 }
+            } finally {
+                SecurityContextHolder.clearContext();
             }
         }, "sse-chat").start();
 
         return emitter;
+    }
+
+    private void saveMessages(Long conversationId, String questionId,
+                               String question, String answer) {
+        if (conversationId == null || questionId == null) return;
+        try {
+            conversationService.saveMessage(conversationId, questionId,
+                    "user", question, null);
+            conversationService.saveMessage(conversationId, questionId,
+                    "assistant", answer, null);
+            log.info("消息已保存: conversationId={}, questionId={}", conversationId, questionId);
+        } catch (Exception e) {
+            log.error("消息保存失败: conversationId={}, questionId={}",
+                    conversationId, questionId, e);
+        }
     }
 
     private String escapeJson(String s) {

@@ -2,135 +2,145 @@ package com.note.service.ai;
 
 import com.note.service.ai.config.ChatAIConfig;
 import com.note.service.ai.config.EmbedAIConfig;
-import com.note.service.ai.facade.EmbeddingService;
-import com.note.service.ai.facade.LLMService;
-import com.note.service.ai.facade.QdrantVectorStore;
-import com.note.service.ai.facade.VectorDoc;
+import com.note.service.ai.pipeline.RAGContext;
+import com.note.service.ai.pipeline.RAGPipeline;
 import com.note.service.common.exception.BusinessException;
+import com.note.service.common.exception.ErrorCode;
+import com.note.service.entity.UserApiProfileEntity;
+import com.note.service.entity.AiProviderEntity;
+import com.note.service.service.AiProviderService;
+import com.note.service.service.ConversationService;
+import com.note.service.service.UserApiProfileService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Service
 public class ChatService {
 
     private final AISettingService aiSettingService;
-    private final EmbeddingService embeddingService;
-    private final LLMService llmService;
-    private final QdrantVectorStore qdrantVectorStore;
-    private final String collection;
-    private final int topK;
-    private final double scoreThreshold;
+    private final AiProviderService aiProviderService;
+    private final UserApiProfileService profileService;
+    private final ConversationService conversationService;
+    private final RAGPipeline pipeline;
 
     public ChatService(AISettingService aiSettingService,
-                       EmbeddingService embeddingService,
-                       LLMService llmService,
-                       QdrantVectorStore qdrantVectorStore,
-                       @Value("${qdrant.collection}") String collection,
-                       @Value("${note.retrieval.top-k:5}") int topK,
-                       @Value("${note.retrieval.score-threshold:0.3}") double scoreThreshold) {
+                       AiProviderService aiProviderService,
+                       UserApiProfileService profileService,
+                       ConversationService conversationService,
+                       RAGPipeline pipeline) {
         this.aiSettingService = aiSettingService;
-        this.embeddingService = embeddingService;
-        this.llmService = llmService;
-        this.qdrantVectorStore = qdrantVectorStore;
-        this.collection = collection;
-        this.topK = topK;
-        this.scoreThreshold = scoreThreshold;
+        this.aiProviderService = aiProviderService;
+        this.profileService = profileService;
+        this.conversationService = conversationService;
+        this.pipeline = pipeline;
     }
 
+    /**
+     * RAG 对话入口（旧版兼容：使用 user_ai_config 表）。
+     */
     public Flux<String> ask(Long userId, String question,
-                            String scopeType, List<Long> scopeIds) {
+                            String scopeType, List<Long> scopeIds, String style,
+                            Long conversationId,
+                            AtomicLong conversationIdOut,
+                            String[] questionIdOut) {
+        return ask(userId, question, scopeType, scopeIds, style, conversationId,
+                conversationIdOut, questionIdOut, null, null);
+    }
 
-        // Phase 1: Retrieve context (blocking — must complete before LLM prompt is built)
-        EmbedAIConfig embedConfig;
+    /**
+     * RAG 对话入口（新版：使用 Profile，支持指定模型）。
+     * @param profileId        API Profile ID（非 null 则使用 Profile 制）
+     * @param modelName        指定使用的模型名（如 deepseek-chat）
+     */
+    public Flux<String> ask(Long userId, String question,
+                            String scopeType, List<Long> scopeIds, String style,
+                            Long conversationId,
+                            AtomicLong conversationIdOut,
+                            String[] questionIdOut,
+                            Long profileId, String modelName) {
+
         ChatAIConfig chatConfig;
-        try {
-            embedConfig = aiSettingService.getDecryptedEmbedConfig(userId);
-            chatConfig = aiSettingService.getDecryptedChatConfig(userId);
-        } catch (BusinessException e) {
-            return Flux.error(e);
-        }
+        EmbedAIConfig embedConfig;
 
-        long t0 = System.currentTimeMillis();
-        List<Float> queryVector;
-        try {
-            queryVector = embeddingService.embed(question, embedConfig);
-        } catch (BusinessException e) {
-            return Flux.error(e);
-        }
-        long embedMs = System.currentTimeMillis() - t0;
-
-        Map<String, Object> filter = buildScopeFilter(userId, scopeType, scopeIds);
-        long t1 = System.currentTimeMillis();
-        List<VectorDoc> docs;
-        try {
-            docs = qdrantVectorStore.search(collection, queryVector, filter, topK);
-        } catch (BusinessException e) {
-            return Flux.error(e);
-        }
-        long searchMs = System.currentTimeMillis() - t1;
-
-        // Filter low-score results
-        List<VectorDoc> filteredDocs = docs.stream()
-                .filter(d -> d.getScore() != null && d.getScore() >= scoreThreshold)
-                .collect(Collectors.toList());
-        log.info("RAG prep: embed={}ms, search={}ms, hits={}, filtered={}",
-                embedMs, searchMs, docs.size(), filteredDocs.size());
-
-        String prompt = buildPrompt(question, filteredDocs);
-        List<Map<String, String>> messages = List.of(
-                Map.of("role", "system", "content", buildSystemPrompt()),
-                Map.of("role", "user", "content", prompt)
-        );
-
-        // Phase 2: Real streaming LLM — tokens flow to frontend as they arrive
-        return llmService.streamChat(messages, chatConfig)
-                .doOnNext(token -> {
-                    if ("[DONE]".equals(token)) {
-                        log.info("RAG stream complete");
-                    }
-                })
-                .concatWithValues("[DONE]");
-    }
-
-    private Map<String, Object> buildScopeFilter(Long userId, String scopeType,
-                                                  List<Long> scopeIds) {
-        Map<String, Object> filter = new LinkedHashMap<>();
-        filter.put("userId", userId);
-        if ("NOTE".equals(scopeType) && scopeIds != null && scopeIds.size() == 1) {
-            filter.put("noteId", scopeIds.get(0));
-        }
-        return filter;
-    }
-
-    private String buildPrompt(String question, List<VectorDoc> docs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("根据以下笔记片段回答问题。如果片段不足以回答，直接说'笔记中没有相关信息'。\n\n");
-
-        if (docs.isEmpty()) {
-            sb.append("（无相关笔记片段）\n");
-        } else {
-            sb.append("相关笔记片段：\n");
-            for (int i = 0; i < docs.size(); i++) {
-                VectorDoc doc = docs.get(i);
-                sb.append("\n---\n");
-                sb.append("[来源 ").append(i + 1).append(": ");
-                sb.append(doc.getPayload().getOrDefault("title", "未知笔记")).append("]\n");
-                sb.append(doc.getPayload().getOrDefault("text", ""));
-                sb.append("\n");
+        if (profileId != null) {
+            // 新版：从 Profile 构建配置
+            UserApiProfileEntity profile = profileService.getById(profileId, userId);
+            String apiKey = profileService.decryptApiKey(profile);
+            if (apiKey == null || apiKey.isEmpty()) {
+                return Flux.error(new BusinessException(ErrorCode.AI_CONFIG_NOT_FOUND,
+                    "Profile「" + profile.getProfileName() + "」未配置 API Key，请在设置中填写"));
             }
+            String baseUrl = profile.getBaseUrl();
+            String providerKey = profile.getProviderKey();
+
+            AiProviderEntity provider = aiProviderService.getProvider(providerKey);
+            String pluginType = provider.getPluginType();
+            String actualModel = (modelName != null && !modelName.isEmpty()) ? modelName : "default";
+
+            chatConfig = ChatAIConfig.builder()
+                    .provider(providerKey).apiKey(apiKey).model(actualModel)
+                    .baseUrl(baseUrl).pluginType(pluginType).build();
+
+            // Embedding 使用厂商预置的默认 embedding 模型（无需用户手动选择）
+            String embedModel = aiProviderService.getDefaultEmbedModel(providerKey);
+            if (embedModel == null) {
+                return Flux.error(new BusinessException(ErrorCode.AI_CONFIG_NOT_FOUND,
+                    "厂商「" + provider.getName() + "」未配置 Embedding 模型，无法进行知识检索"));
+            }
+            embedConfig = EmbedAIConfig.builder()
+                    .provider(providerKey).apiKey(apiKey).model(embedModel)
+                    .baseUrl(baseUrl).pluginType(pluginType).build();
+        } else {
+            // 旧版兼容：从 user_ai_config + ai_provider 构建
+            var userConfig = aiSettingService.getByUserId(userId);
+            if (userConfig == null) {
+                return Flux.error(new BusinessException(ErrorCode.AI_CONFIG_NOT_FOUND));
+            }
+            embedConfig = aiProviderService.buildEmbedConfig(
+                    userConfig.getEmbedProvider(), userConfig.getEmbedModel(),
+                    userConfig.getEmbedUrl());
+            chatConfig = aiProviderService.buildChatConfig(
+                    userConfig.getChatProvider(), userConfig.getChatModel(),
+                    userConfig.getChatUrl());
         }
 
-        sb.append("\n问题：").append(question);
-        return sb.toString();
-    }
+        // 2. 对话管理
+        Long cid = conversationId;
+        String qid = UUID.randomUUID().toString().replace("-", "");
+        List<Map<String, String>> history = List.of();
 
-    private String buildSystemPrompt() {
-        return "你是笔记助手。回答要准确、有条理。使用 Markdown 格式组织回答。";
+        if (cid != null) {
+            history = conversationService.loadHistory(cid, userId, qid);
+        } else {
+            String title = question != null && question.length() > 50
+                    ? question.substring(0, 50) : question;
+            var conv = conversationService.createConversation(userId, title);
+            cid = conv.getId();
+        }
+        conversationIdOut.set(cid);
+        if (questionIdOut != null && questionIdOut.length > 0) {
+            questionIdOut[0] = qid;
+        }
+
+        // 3. 组装上下文
+        RAGContext ctx = new RAGContext();
+        ctx.setUserId(userId);
+        ctx.setQuestion(question);
+        ctx.setScopeType(scopeType);
+        ctx.setScopeIds(scopeIds);
+        ctx.setStyle(style);
+        ctx.setEmbedConfig(embedConfig);
+        ctx.setChatConfig(chatConfig);
+        ctx.setConversationId(cid);
+        ctx.setConversationHistory(history);
+
+        return pipeline.execute(ctx);
     }
 }

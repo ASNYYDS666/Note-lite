@@ -33,7 +33,7 @@ qdrant:
   vector-size: 1536
 
 ai:
-  aes-key: dev-aes-key-note-lite-local-only
+  aes-key: note-lite-devkey
 
 logging:
   level:

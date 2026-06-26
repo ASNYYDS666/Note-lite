@@ -55,12 +55,20 @@ public class MarkdownSplitter implements ContentChunker {
 
         while (start < text.length()) {
             int end = Math.min(start + chunkSize, text.length());
-            if (end < text.length()) {
-                // Prefer paragraph break > sentence end > line break
-                int breakPoint = findBreakPoint(text, start, end);
-                if (breakPoint > start + minChunkSize) {
-                    end = breakPoint + 1;
-                }
+
+            // 到达末尾，直接截取最后一块并退出
+            if (end >= text.length()) {
+                Chunk chunk = new Chunk();
+                chunk.setIndex(baseIndex + result.size());
+                chunk.setText(text.substring(start).trim());
+                chunk.setMetadata(new LinkedHashMap<>(metadata));
+                result.add(chunk);
+                break;
+            }
+
+            int breakPoint = findBreakPoint(text, start, end);
+            if (breakPoint > start + minChunkSize) {
+                end = breakPoint + 1;
             }
 
             Chunk chunk = new Chunk();

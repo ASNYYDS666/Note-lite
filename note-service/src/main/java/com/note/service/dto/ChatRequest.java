@@ -29,4 +29,13 @@ public class ChatRequest {
     @Schema(description = "对话风格", example = "detailed",
             allowableValues = {"concise", "detailed", "code-review"})
     private String style;
+
+    @Schema(description = "对话ID（null 则自动创建新对话）", example = "1")
+    private Long conversationId;
+
+    @Schema(description = "API Profile ID（使用新的 Profile 制）")
+    private Long profileId;
+
+    @Schema(description = "指定使用的模型名（如 deepseek-chat）")
+    private String modelName;
 }

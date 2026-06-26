@@ -1,13 +1,14 @@
 package com.note.service.controller;
 
 import com.note.service.ai.AISettingService;
-import com.note.service.ai.facade.EmbeddingService;
-import com.note.service.ai.facade.LLMService;
-import com.note.service.ai.config.EmbedAIConfig;
 import com.note.service.ai.config.ChatAIConfig;
+import com.note.service.ai.config.EmbedAIConfig;
+import com.note.service.ai.facade.AIFacadeFactory;
+import com.note.service.common.exception.ErrorCode;
 import com.note.service.common.vo.Result;
 import com.note.service.common.vo.UserAIConfigVO;
 import com.note.service.dto.AISettingSaveDTO;
+import com.note.service.service.AiProviderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,8 +26,8 @@ import java.util.Map;
 public class AISettingController {
 
     private final AISettingService aiSettingService;
-    private final LLMService llmService;
-    private final EmbeddingService embeddingService;
+    private final AiProviderService aiProviderService;
+    private final AIFacadeFactory facadeFactory;
 
     @GetMapping("/ai-config")
     @Operation(summary = "获取 AI 配置")
@@ -52,18 +53,29 @@ public class AISettingController {
     @PostMapping("/ai-config/test-chat")
     @Operation(summary = "测试 Chat 连接")
     public Result<Map<String, Object>> testChat(@AuthenticationPrincipal Long userId) {
-        ChatAIConfig config = aiSettingService.getDecryptedChatConfig(userId);
+        var userConfig = aiSettingService.getByUserId(userId);
+        if (userConfig == null) {
+            return Result.error(ErrorCode.AI_CONFIG_NOT_FOUND.getCode(),
+                    ErrorCode.AI_CONFIG_NOT_FOUND.getDefaultMessage());
+        }
+        ChatAIConfig config = aiProviderService.buildChatConfig(
+                userConfig.getChatProvider(), userConfig.getChatModel(),
+                userConfig.getChatUrl());
+
+        var facade = facadeFactory.getLLM(config.getPluginType());
+        if (!(facade instanceof com.note.service.ai.facade.impl.OpenAICompatibleChatFacade oaiChat)) {
+            return Result.success(Map.of("success", true, "model", config.getModel(),
+                    "baseUrl", config.getBaseUrl(), "note", "非 OpenAI 兼容格式，跳过快速测试"));
+        }
+
         long t0 = System.currentTimeMillis();
-        String reply = llmService.chat(
-                List.of(Map.of("role", "user", "content", "hi")),
-                config);
+        String reply = oaiChat.chat(
+                List.of(Map.of("role", "user", "content", "hi")), config);
         long latency = System.currentTimeMillis() - t0;
         return Result.success(Map.of(
                 "success", true,
                 "model", config.getModel(),
-                "baseUrl", config.getBaseUrl() != null ? config.getBaseUrl()
-                        : ("openai".equals(config.getProvider())
-                            ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1"),
+                "baseUrl", config.getBaseUrl(),
                 "latencyMs", latency,
                 "reply", reply.length() > 200 ? reply.substring(0, 200) + "..." : reply
         ));
@@ -72,16 +84,23 @@ public class AISettingController {
     @PostMapping("/ai-config/test-embed")
     @Operation(summary = "测试 Embedding 连接")
     public Result<Map<String, Object>> testEmbed(@AuthenticationPrincipal Long userId) {
-        EmbedAIConfig config = aiSettingService.getDecryptedEmbedConfig(userId);
+        var userConfig = aiSettingService.getByUserId(userId);
+        if (userConfig == null) {
+            return Result.error(ErrorCode.AI_CONFIG_NOT_FOUND.getCode(),
+                    ErrorCode.AI_CONFIG_NOT_FOUND.getDefaultMessage());
+        }
+        EmbedAIConfig config = aiProviderService.buildEmbedConfig(
+                userConfig.getEmbedProvider(), userConfig.getEmbedModel(),
+                userConfig.getEmbedUrl());
+
+        var facade = facadeFactory.getEmbedding(config.getPluginType());
         long t0 = System.currentTimeMillis();
-        List<Float> vector = embeddingService.embed("test", config);
+        List<Float> vector = facade.embed("test", config);
         long latency = System.currentTimeMillis() - t0;
         return Result.success(Map.of(
                 "success", true,
                 "model", config.getModel(),
-                "baseUrl", config.getBaseUrl() != null ? config.getBaseUrl()
-                        : ("openai".equals(config.getProvider())
-                            ? "https://api.openai.com/v1" : "https://api.deepseek.com/v1"),
+                "baseUrl", config.getBaseUrl(),
                 "dimension", vector.size(),
                 "latencyMs", latency
         ));

@@ -2,7 +2,6 @@ package com.note.service.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -13,7 +12,6 @@ public class AISettingSaveDTO {
     // ========== Chat 配置 ==========
 
     @NotBlank(message = "Chat 服务商不能为空")
-    @Pattern(regexp = "^(deepseek|openai)$", message = "Chat 服务商仅支持 deepseek/openai")
     @Schema(description = "Chat 服务商", example = "deepseek")
     private String chatProvider;
 
@@ -31,14 +29,11 @@ public class AISettingSaveDTO {
 
     // ========== Embedding 配置 ==========
 
-    @NotBlank(message = "Embedding 服务商不能为空")
-    @Pattern(regexp = "^(openai|deepseek)$", message = "Embedding 服务商仅支持 openai")
-    @Schema(description = "Embedding 服务商", example = "openai")
+    @Schema(description = "Embedding 服务商（可选）", example = "openai")
     private String embedProvider;
 
-    @NotBlank(message = "Embedding API Key 不能为空")
     @Size(max = 255, message = "API Key 最长255字符")
-    @Schema(description = "Embedding API Key")
+    @Schema(description = "Embedding API Key（可选）")
     private String embedApiKey;
 
     @Size(max = 50, message = "模型名最长50字符")

@@ -2,6 +2,7 @@ package com.note.service.ai.pipeline;
 
 import com.note.service.ai.config.ChatAIConfig;
 import com.note.service.ai.config.EmbedAIConfig;
+import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.VectorDoc;
 import lombok.Data;
 import reactor.core.publisher.Flux;
@@ -37,5 +38,5 @@ public class RAGContext {
     private List<Map<String, String>> messages;  // Stage 5: 最终消息列表
 
     // ====== 输出（由 Stage 6 设置） ======
-    private Flux<String> responseStream;         // Stage 6: LLM 流式响应
+    private Flux<ChatToken> responseStream;      // Stage 6: LLM 流式响应
 }

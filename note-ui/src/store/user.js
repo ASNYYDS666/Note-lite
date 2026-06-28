@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import request from '@/utils/request'
+import { useAIStore } from '@/store/ai'
 
 export const useUserStore = defineStore('user', () => {
   const storedToken = localStorage.getItem('token')
@@ -47,6 +48,8 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
+    // 清理 AI 对话状态，防止切换账号后残留
+    useAIStore().newConversation()
   }
 
   return {

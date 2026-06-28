@@ -1,5 +1,6 @@
 package com.note.service.ai.pipeline;
 
+import com.note.service.ai.facade.ChatToken;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,7 @@ public class RAGPipeline {
      * 执行管道：顺序同步执行 Stage 1-5，返回 Stage 6 的流式响应。
      * 每个活跃 Stage 通过 AOP {@code @MonitorStage} 自动记录耗时指标。
      */
-    public Flux<String> execute(RAGContext ctx) {
+    public Flux<ChatToken> execute(RAGContext ctx) {
         Timer.Sample totalSample = Timer.start(registry);
         try {
             for (RAGStage stage : stages) {

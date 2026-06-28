@@ -28,7 +28,7 @@ jwt:
 # RAG 开发环境配置
 qdrant:
   host: localhost
-  port: 6334
+  port: 16333
   collection: note_chunks
   vector-size: 1536
 

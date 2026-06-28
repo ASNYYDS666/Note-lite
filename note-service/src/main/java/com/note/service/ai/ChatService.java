@@ -45,7 +45,7 @@ public class ChatService {
     /**
      * RAG 对话入口（旧版兼容：使用 user_ai_config 表）。
      */
-    public Flux<String> ask(Long userId, String question,
+    public Flux<com.note.service.ai.facade.ChatToken> ask(Long userId, String question,
                             String scopeType, List<Long> scopeIds, String style,
                             Long conversationId,
                             AtomicLong conversationIdOut,
@@ -59,7 +59,7 @@ public class ChatService {
      * @param profileId        API Profile ID（非 null 则使用 Profile 制）
      * @param modelName        指定使用的模型名（如 deepseek-chat）
      */
-    public Flux<String> ask(Long userId, String question,
+    public Flux<com.note.service.ai.facade.ChatToken> ask(Long userId, String question,
                             String scopeType, List<Long> scopeIds, String style,
                             Long conversationId,
                             AtomicLong conversationIdOut,

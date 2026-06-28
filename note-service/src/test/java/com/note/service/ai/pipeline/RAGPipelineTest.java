@@ -1,5 +1,6 @@
 package com.note.service.ai.pipeline;
 
+import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.pipeline.stages.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -66,7 +67,7 @@ class RAGPipelineTest {
             pipeline = new RAGPipeline(List.of(mockStage2), registry);
 
             RAGContext ctx = new RAGContext();
-            ctx.setResponseStream(Flux.just("test"));
+            ctx.setResponseStream(Flux.just(ChatToken.answer("test")));
 
             pipeline.execute(ctx);
 
@@ -85,9 +86,9 @@ class RAGPipelineTest {
             pipeline = new RAGPipeline(List.of(mockStage2), registry);
 
             RAGContext ctx = new RAGContext();
-            ctx.setResponseStream(Flux.just("test"));
+            ctx.setResponseStream(Flux.just(ChatToken.answer("test")));
 
-            Flux<String> result = pipeline.execute(ctx);
+            Flux<ChatToken> result = pipeline.execute(ctx);
 
             StepVerifier.create(result)
                     .expectError(RuntimeException.class)
@@ -101,7 +102,7 @@ class RAGPipelineTest {
             pipeline = new RAGPipeline(List.of(mockStage2, mockStage3), registry);
 
             RAGContext ctx = new RAGContext();
-            ctx.setResponseStream(Flux.just("test"));
+            ctx.setResponseStream(Flux.just(ChatToken.answer("test")));
 
             pipeline.execute(ctx);
 

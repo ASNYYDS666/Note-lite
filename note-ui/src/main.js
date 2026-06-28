@@ -27,6 +27,12 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     app.component(key, component)
 }
 
+// 主题初始化
+const savedTheme = localStorage.getItem('note-lite-theme')
+if (savedTheme === 'dark') {
+  document.documentElement.classList.add('dark')
+}
+
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus)

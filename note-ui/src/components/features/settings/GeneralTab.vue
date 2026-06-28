@@ -15,19 +15,38 @@
         <span class="setting-label">Theme</span>
         <span class="setting-desc">亮色 / 暗色主题切换</span>
       </div>
-      <el-select v-model="theme" size="small" style="width: 160px" disabled>
+      <el-select v-model="theme" size="small" style="width: 160px" @change="onThemeChange">
         <el-option label="Light" value="light" />
         <el-option label="Dark" value="dark" />
       </el-select>
     </div>
-    <p class="placeholder-note">通用设置暂未开放</p>
+    <p class="placeholder-note">语言切换暂未开放</p>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+
+const THEME_KEY = 'note-lite-theme'
+
 const lang = ref('zh-CN')
 const theme = ref('light')
+
+onMounted(() => {
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'dark' || saved === 'light') {
+    theme.value = saved
+  }
+})
+
+function onThemeChange(val) {
+  localStorage.setItem(THEME_KEY, val)
+  if (val === 'dark') {
+    document.documentElement.classList.add('dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+  }
+}
 </script>
 
 <style scoped>

@@ -1,6 +1,7 @@
 package com.note.service.ai.pipeline.stages;
 
 import com.note.service.ai.facade.AIFacadeFactory;
+import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.LLMFacade;
 import com.note.service.ai.metrics.MonitorStage;
 import com.note.service.ai.pipeline.RAGContext;
@@ -25,11 +26,11 @@ public class GenerationStage implements RAGStage {
         ctx.setResponseStream(
             llm.streamChat(ctx.getMessages(), ctx.getChatConfig())
                 .doOnNext(token -> {
-                    if ("[DONE]".equals(token)) {
+                    if (token.isDone()) {
                         log.info("RAG stream complete");
                     }
                 })
-                .concatWithValues("[DONE]")
+                .concatWithValues(ChatToken.DONE)
         );
     }
 }

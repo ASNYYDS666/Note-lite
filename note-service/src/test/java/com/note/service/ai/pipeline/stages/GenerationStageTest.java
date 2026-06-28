@@ -2,6 +2,7 @@ package com.note.service.ai.pipeline.stages;
 
 import com.note.service.ai.config.ChatAIConfig;
 import com.note.service.ai.facade.AIFacadeFactory;
+import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.LLMFacade;
 import com.note.service.ai.pipeline.RAGContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class GenerationStageTest {
 
         when(factory.getLLM(eq("openai_compatible"))).thenReturn(llm);
         when(llm.streamChat(any(), any()))
-                .thenReturn(Flux.just("你好", "世界"));
+                .thenReturn(Flux.just(ChatToken.answer("你好"), ChatToken.answer("世界")));
     }
 
     @Test
@@ -64,16 +65,16 @@ class GenerationStageTest {
     }
 
     @Test
-    @DisplayName("ctx.responseStream 末尾包含 [DONE]")
+    @DisplayName("ctx.responseStream 末尾包含 DONE")
     void testResponseStreamEndsWithDone() {
         stage.process(ctx);
 
-        Flux<String> stream = ctx.getResponseStream();
+        Flux<ChatToken> stream = ctx.getResponseStream();
         assertThat(stream).isNotNull();
 
         StepVerifier.create(stream)
-                .expectNext("你好", "世界")
-                .expectNext("[DONE]")
+                .expectNext(ChatToken.answer("你好"), ChatToken.answer("世界"))
+                .expectNext(ChatToken.DONE)
                 .verifyComplete();
     }
 

@@ -16,6 +16,9 @@
     >
       <span class="material-symbols-outlined">search</span>
     </button>
+
+    <div class="rail-divider"></div>
+
     <button
       class="rail-btn"
       :class="{ active: workspace.showTrash }"
@@ -82,7 +85,7 @@ function handleNewNote() {
   flex-direction: column;
   align-items: center;
   padding: var(--gutter-md) 0;
-  gap: 2px;
+  gap: 5px;
   z-index: 90;
 }
 

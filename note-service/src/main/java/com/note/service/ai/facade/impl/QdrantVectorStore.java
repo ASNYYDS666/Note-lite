@@ -27,14 +27,17 @@ public class QdrantVectorStore implements VectorStore {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
     private final String qdrantHost;
+    private final int qdrantPort;
     private final Cache<String, List<VectorDoc>> searchCache;
 
     public QdrantVectorStore(WebClient.Builder webClientBuilder,
                              ObjectMapper objectMapper,
-                             @Value("${qdrant.host}") String qdrantHost) {
+                             @Value("${qdrant.host}") String qdrantHost,
+                             @Value("${qdrant.port:6333}") int qdrantPort) {
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
         this.qdrantHost = qdrantHost;
+        this.qdrantPort = qdrantPort;
         this.searchCache = Caffeine.newBuilder()
                 .maximumSize(1000)
                 .expireAfterWrite(5, TimeUnit.MINUTES)
@@ -43,7 +46,7 @@ public class QdrantVectorStore implements VectorStore {
     }
 
     private String baseUrl() {
-        return "http://" + qdrantHost + ":6333";
+        return "http://" + qdrantHost + ":" + qdrantPort;
     }
 
     private WebClient client() {

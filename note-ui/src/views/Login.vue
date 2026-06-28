@@ -343,13 +343,13 @@ async function handleLogin() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 32px;
+  padding: 80px 32px 0 32px;
   background: var(--bg);
 }
 
 @media (min-width: 768px) {
   .form-section {
-    padding: 0 96px;
+    padding: 80px 96px 0 96px;
   }
 }
 

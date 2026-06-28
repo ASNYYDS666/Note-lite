@@ -14,3 +14,5 @@
 {{/hasChunks}}
 
 用户问题：{{question}}
+
+请使用标准 Markdown 格式回答，代码用三个反引号包裹并标注语言。

@@ -1,6 +1,7 @@
 package com.note.service.ai.controller;
 
 import com.note.service.ai.ChatService;
+import com.note.service.ai.facade.ChatToken;
 import com.note.service.dto.ChatRequest;
 import com.note.service.service.ConversationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,15 +52,16 @@ public class ChatController {
                         .subscribe(
                                 token -> {
                                     try {
-                                        if ("[DONE]".equals(token)) {
+                                        if (token.isDone()) {
                                             emitter.send(SseEmitter.event()
                                                     .data("{\"done\":true,\"conversationId\":"
                                                             + cidHolder.get() + "}"));
                                         } else {
-                                            responseBuffer.append(token);
+                                            responseBuffer.append(token.text());
                                             emitter.send(SseEmitter.event()
-                                                    .data("{\"token\":\"" + escapeJson(token)
-                                                            + "\",\"done\":false}"));
+                                                    .data("{\"token\":\"" + escapeJson(token.text())
+                                                            + "\",\"thinking\":" + token.thinking()
+                                                            + ",\"done\":false}"));
                                         }
                                     } catch (IOException e) {
                                         emitter.completeWithError(e);

@@ -13,6 +13,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const leftPanelWidth = ref(220)
   const agentPanelWidth = ref(360)
 
+  const MIN_PANEL_WIDTH = 180
+  const MAX_PANEL_WIDTH = 600
+
   const showNoteTree = computed(() => activeLeftPanel.value === 'tree')
   const showSearchPanel = computed(() => activeLeftPanel.value === 'search')
   const showEditor = computed(() => activeMainView.value === 'editor')
@@ -49,12 +52,22 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     settingsDialogVisible.value = false
   }
 
+  function setLeftPanelWidth(w) {
+    leftPanelWidth.value = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, w))
+  }
+
+  function setAgentPanelWidth(w) {
+    agentPanelWidth.value = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, w))
+  }
+
   return {
     activeLeftPanel, activeMainView, currentNoteId, isCreatingNew, selectedFolderId,
     agentPanelVisible, settingsDialogVisible,
     leftPanelWidth, agentPanelWidth,
     showNoteTree, showSearchPanel, showEditor, showTrash,
     switchLeftPanel, switchMainView, openNote,
-    toggleAgentPanel, openSettings, closeSettings
+    toggleAgentPanel, openSettings, closeSettings,
+    setLeftPanelWidth, setAgentPanelWidth,
+    MIN_PANEL_WIDTH, MAX_PANEL_WIDTH
   }
 })

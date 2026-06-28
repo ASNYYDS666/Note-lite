@@ -16,3 +16,5 @@
 {{/hasChunks}}
 
 用户问题：{{question}}
+
+请使用标准 Markdown 格式回答。Before/After 代码对比用三个反引号标注语言，标题层级用 # ## ###。

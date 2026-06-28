@@ -41,8 +41,8 @@ services:
     image: qdrant/qdrant:latest
     container_name: note-qdrant
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "16333:6333"
+      - "16334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
     restart: unless-stopped

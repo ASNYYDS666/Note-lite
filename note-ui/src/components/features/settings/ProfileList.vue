@@ -20,6 +20,10 @@
           <span class="pl-meta">{{ modelSummary(p) }}</span>
         </div>
         <span class="pl-badge">{{ enabledCount(p) }}</span>
+        <label class="pl-enable-toggle" @click.stop>
+          <input type="checkbox" :checked="enabled(p.id)" @change="toggleEnable(p.id)" />
+          <span class="pl-toggle-slider"></span>
+        </label>
       </button>
       <div v-if="profiles.length === 0" class="pl-empty">
         暂无 Profile，点击 + 新建
@@ -29,12 +33,24 @@
 </template>
 
 <script setup>
+import { useAIStore } from '@/store/ai'
+
 defineProps({
   profiles: { type: Array, default: () => [] },
   activeId: { type: [String, Number], default: null }
 })
 
 defineEmits(['add', 'select'])
+
+const ai = useAIStore()
+
+function enabled(profileId) {
+  return ai.enabledProfileIds.includes(profileId)
+}
+
+function toggleEnable(profileId) {
+  ai.toggleProfileEnabled(profileId)
+}
 
 function parseModels(p) {
   if (!p.enabledModels) return []
@@ -119,5 +135,37 @@ function modelSummary(p) {
 
 .pl-empty {
   font-size: 11px; color: var(--outline); text-align: center; padding: 20px 0;
+}
+
+.pl-enable-toggle {
+  position: relative; display: inline-block;
+  width: 36px; height: 20px; flex-shrink: 0; margin-left: 6px;
+}
+
+.pl-enable-toggle input { opacity: 0; width: 0; height: 0; }
+
+.pl-toggle-slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--surface-container-high);
+  border-radius: 20px; transition: background 0.2s;
+  border: 1px solid var(--outline-variant);
+}
+
+.pl-toggle-slider::before {
+  content: ''; position: absolute;
+  height: 14px; width: 14px; left: 2px; bottom: 2px;
+  background: var(--on-surface-variant);
+  border-radius: 50%; transition: transform 0.2s, background 0.2s;
+}
+
+.pl-enable-toggle input:checked + .pl-toggle-slider {
+  background: var(--secondary-container);
+  border-color: var(--secondary);
+}
+
+.pl-enable-toggle input:checked + .pl-toggle-slider::before {
+  transform: translateX(16px);
+  background: var(--secondary);
 }
 </style>

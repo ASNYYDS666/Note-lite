@@ -1,4 +1,9 @@
 # ========== 生产环境配置 ==========
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL}
@@ -6,11 +11,13 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 10
-      connection-timeout: 3000
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 5000
       idle-timeout: 600000
       max-lifetime: 1800000
+      metrics:
+        enabled: true
 
   data:
     redis:
@@ -31,9 +38,9 @@ jwt:
 # RAG 生产环境配置
 qdrant:
   host: ${QDRANT_HOST}
-  port: ${QDRANT_PORT:6334}
+  port: ${QDRANT_PORT:6333}
   collection: note_chunks
-  vector-size: 1536
+  vector-size: 512
 
 ai:
   aes-key: ${AI_AES_KEY}

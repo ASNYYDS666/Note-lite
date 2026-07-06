@@ -1,5 +1,5 @@
 import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 from fastapi import FastAPI, Request
 from sentence_transformers import SentenceTransformer

@@ -11,6 +11,7 @@ public enum ErrorCode {
     LOGIN_FAILED(10003, "用户名或密码错误"),
     TOKEN_EXPIRED(10004, "Token 已过期"),
     TOKEN_INVALID(10005, "Token 无效"),
+    USER_NOT_FOUND(10006, "用户不存在"),
 
     // ========== 笔记模块 200xx ==========
     NOTE_NOT_FOUND(20001, "笔记不存在"),

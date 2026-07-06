@@ -9,15 +9,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    private final ThreadPoolTaskExecutor embeddingExecutor;
+    private final ThreadPoolTaskExecutor webAsyncExecutor;
 
-    public WebMvcConfig(@Qualifier("embeddingExecutor") ThreadPoolTaskExecutor embeddingExecutor) {
-        this.embeddingExecutor = embeddingExecutor;
+    public WebMvcConfig(@Qualifier("webAsyncExecutor") ThreadPoolTaskExecutor webAsyncExecutor) {
+        this.webAsyncExecutor = webAsyncExecutor;
     }
 
     @Override
     public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
-        configurer.setTaskExecutor(embeddingExecutor);
+        configurer.setTaskExecutor(webAsyncExecutor);
         configurer.setDefaultTimeout(120_000);
     }
 }

@@ -100,15 +100,8 @@ public class NoteFolderService extends ServiceImpl<NoteFolderMapper, NoteFolderE
             noteService.invalidateNoteCache(note.getId(), userId);
         }
 
-        // 3. 删除所有子孙文件夹
-        for (Long fid : allFolderIds) {
-            if (!fid.equals(folderId)) {
-                baseMapper.deleteById(fid);
-            }
-        }
-
-        // 4. 删除当前文件夹
-        baseMapper.deleteById(folderId);
+        // 3. 批量删除当前文件夹及所有子孙文件夹
+        baseMapper.deleteBatchIds(allFolderIds);
 
         log.info("删除文件夹: folderId={}, 级联删除子文件夹数={}, 移入回收站笔记数={}",
                 folderId, allFolderIds.size() - 1, notesToDelete.size());
@@ -124,35 +117,12 @@ public class NoteFolderService extends ServiceImpl<NoteFolderMapper, NoteFolderE
         return folder;
     }
 
-    /**
-     * 检查 targetId 是否是 sourceId 的子孙节点
-     */
     private boolean isDescendantOf(Long userId, Long targetId, Long sourceId) {
-        NoteFolderEntity target = baseMapper.selectById(targetId);
-        if (target == null || !target.getUserId().equals(userId)) {
-            return false;
-        }
-        Long currentId = target.getParentId();
-        while (currentId != null) {
-            if (currentId.equals(sourceId)) {
-                return true;
-            }
-            NoteFolderEntity current = baseMapper.selectById(currentId);
-            if (current == null) break;
-            currentId = current.getParentId();
-        }
-        return false;
+        return baseMapper.isAncestorOf(userId, targetId, sourceId);
     }
 
-    /**
-     * 递归收集所有子孙文件夹ID
-     */
     private void collectDescendantFoldIds(Long userId, Long folderId, Set<Long> result) {
-        List<NoteFolderEntity> children = baseMapper.selectByParentId(folderId, userId);
-        for (NoteFolderEntity child : children) {
-            result.add(child.getId());
-            collectDescendantFoldIds(userId, child.getId(), result);
-        }
+        result.addAll(baseMapper.selectDescendantIds(userId, folderId));
     }
 
     /**

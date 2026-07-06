@@ -208,6 +208,7 @@ import { ref, watch, nextTick, computed, onMounted, watchEffect } from 'vue'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useAIStore } from '@/store/ai'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const workspace = useWorkspaceStore()
 const ai = useAIStore()
@@ -222,23 +223,23 @@ const scopeIcon = computed(() => {
 })
 
 const modelKey = computed(() => {
-  if (!ai.activeProfileId || !ai.activeModel) {
-    // auto-select first enabled profile's first model
-    if (ai.enabledProfiles.length > 0) {
-      const p = ai.enabledProfiles[0]
-      const models = getModels(p)
-      if (models.length > 0) {
-        // 静默选择，不触发 reactivity 循环
-        setTimeout(() => {
-          if (!ai.activeProfileId) ai.selectActiveProfile(p.id)
-          if (!ai.activeModel) ai.selectActiveModel(models[0])
-        }, 0)
-      }
-    }
-    return ''
-  }
+  if (!ai.activeProfileId || !ai.activeModel) return ''
   return ai.activeProfileId + '::' + ai.activeModel
 })
+
+watch(
+  [() => ai.enabledProfiles, () => ai.activeProfileId, () => ai.activeModel],
+  ([profiles, profileId, model]) => {
+    if (profileId && model) return
+    if (!profiles || profiles.length === 0) return
+    const p = profiles[0]
+    const models = getModels(p)
+    if (models.length === 0) return
+    if (!profileId) ai.selectActiveProfile(p.id)
+    if (!model) ai.selectActiveModel(models[0])
+  },
+  { immediate: true }
+)
 
 function getModels(profile) {
   if (!profile || !profile.enabledModels) return []
@@ -322,6 +323,7 @@ function toggleView(view) {
     ai.setView('chat')
   } else {
     if (view === 'history') ai.loadConversations()
+    if (view === 'settings') ai.loadProfiles()
     ai.setView(view)
   }
 }
@@ -344,7 +346,7 @@ function navigateToNote(noteId) {
 function renderMarkdown(text) {
   if (!text) return ''
   try {
-    return marked.parse(text, { breaks: true })
+    return DOMPurify.sanitize(marked.parse(text, { breaks: true }))
   } catch {
     return text
   }
@@ -760,13 +762,6 @@ function formatDate(ts) {
 
 .confirm-btn.cancel { background: var(--surface-container); color: var(--on-surface); }
 .confirm-btn.danger { background: var(--error); color: var(--on-error); }
-
-/* ===== Scrolbar ===== */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--secondary-fixed); border-radius: 10px;
-}
 
 /* Markdown styles */
 .think-body :deep(p) { margin: 0 0 4px; }

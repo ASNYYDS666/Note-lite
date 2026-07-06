@@ -6,9 +6,9 @@ import com.note.service.ai.config.EmbedAIConfig;
 import com.note.service.ai.facade.EmbeddingFacade;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -18,11 +18,23 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OpenAICompatibleEmbeddingFacade implements EmbeddingFacade {
 
-    private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
+
+    // 部分厂商 API 限制单次请求最多 N 条文本，超出需分批
+    private static final int BATCH_SIZE = 100;
+    // Embedding 响应可能很大（24条×1536维 ≈ 784KB），超过默认256KB限制
+    private final WebClient largeBufferClient;
+
+    public OpenAICompatibleEmbeddingFacade(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+        this.largeBufferClient = webClientBuilder
+                .exchangeStrategies(ExchangeStrategies.builder()
+                        .codecs(c -> c.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                        .build())
+                .build();
+    }
 
     @Override
     public List<Float> embed(String text, EmbedAIConfig config) {
@@ -31,12 +43,24 @@ public class OpenAICompatibleEmbeddingFacade implements EmbeddingFacade {
 
     @Override
     public List<List<Float>> embedBatch(List<String> texts, EmbedAIConfig config) {
-        String baseUrl = config.getBaseUrl();
-        String fullUrl = baseUrl + "/embeddings";
-        WebClient client = webClientBuilder.baseUrl(baseUrl).build();
+        if (texts.size() <= BATCH_SIZE) {
+            return doEmbedBatch(texts, config);
+        }
+        List<List<Float>> all = new ArrayList<>();
+        for (int i = 0; i < texts.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, texts.size());
+            all.addAll(doEmbedBatch(texts.subList(i, end), config));
+        }
+        return all;
+    }
 
-        log.info("Embedding 请求: url={}, model={}, textLen={}",
-                fullUrl, config.getModel(), texts.get(0).length());
+    private List<List<Float>> doEmbedBatch(List<String> texts, EmbedAIConfig config) {
+        String baseUrl = ensureProtocol(config.getBaseUrl());
+        String fullUrl = baseUrl + "/embeddings";
+        WebClient client = largeBufferClient.mutate().baseUrl(baseUrl).build();
+
+        log.info("Embedding 请求: url={}, model={}, textLen={}, batchSize={}",
+                fullUrl, config.getModel(), texts.get(0).length(), texts.size());
 
         try {
             JsonNode response = client.post()
@@ -57,8 +81,8 @@ public class OpenAICompatibleEmbeddingFacade implements EmbeddingFacade {
                 item.get("embedding").forEach(node -> vec.add((float) node.asDouble()));
                 result.add(vec);
             }
-            log.info("Embedding 成功: model={}, dim={}", config.getModel(),
-                    result.isEmpty() ? 0 : result.get(0).size());
+            log.info("Embedding 成功: model={}, dim={}",
+                    config.getModel(), result.isEmpty() ? 0 : result.get(0).size());
             return result;
 
         } catch (WebClientResponseException.Unauthorized e) {
@@ -103,5 +127,11 @@ public class OpenAICompatibleEmbeddingFacade implements EmbeddingFacade {
     @Override
     public boolean supports(String provider) {
         return true;
+    }
+
+    private static String ensureProtocol(String url) {
+        if (url == null || url.isEmpty()) return url;
+        if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        return "https://" + url;
     }
 }

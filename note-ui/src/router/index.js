@@ -33,10 +33,16 @@ const router = createRouter({
     routes
 })
 
-// 全局路由守卫 (开发预览阶段关闭鉴权)
 router.beforeEach((to, from, next) => {
-    // TODO: 预览完成后恢复鉴权
-    next()
+    const userStore = useUserStore()
+
+    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+        next({ name: 'Login', query: { redirect: to.fullPath } })
+    } else if (to.name === 'Login' && userStore.isLoggedIn) {
+        next({ name: 'Workspace' })
+    } else {
+        next()
+    }
 })
 
 export default router

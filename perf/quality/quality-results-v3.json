@@ -1,0 +1,572 @@
+{
+  "summary": {
+    "total": 25,
+    "hitCount": 23,
+    "hitRate": "92.0%",
+    "totalDurationMs": 113104,
+    "byCategory": {
+      "短文本检索": {
+        "total": 4,
+        "hit": 4
+      },
+      "长文本检索": {
+        "total": 4,
+        "hit": 4
+      },
+      "切分边界": {
+        "total": 4,
+        "hit": 4
+      },
+      "多笔记干扰": {
+        "total": 4,
+        "hit": 4
+      },
+      "语义等价": {
+        "total": 4,
+        "hit": 3
+      },
+      "超长文本": {
+        "total": 3,
+        "hit": 3
+      },
+      "代码混合": {
+        "total": 2,
+        "hit": 1
+      }
+    },
+    "timestamp": "2026-07-02T12:48:54.440Z"
+  },
+  "results": [
+    {
+      "id": "Q01",
+      "question": "青鸟科技IoT平台使用什么协议进行设备认证？密钥长度是多少？",
+      "category": "短文本检索",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 4,
+      "matchRatio": "1.00",
+      "matched": [
+        "MQTT",
+        "TLS",
+        "256位",
+        "X.509"
+      ],
+      "missed": [],
+      "answerPreview": "# 设备认证协议与密钥长度\n\n- 使用协议：`MQTT 5.0`  \n- 认证机制：`X.509证书 + TLS 1.3双向认证`  \n- 密钥长度：`不低于256位ECC椭圆曲线`  \n\n引用来源：[^1]《青鸟IoT平台-设备认证方案》",
+      "fullAnswer": "# 设备认证协议与密钥长度\n\n- 使用协议：`MQTT 5.0`  \n- 认证机制：`X.509证书 + TLS 1.3双向认证`  \n- 密钥长度：`不低于256位ECC椭圆曲线`  \n\n引用来源：[^1]《青鸟IoT平台-设备认证方案》",
+      "latencyMs": 21806,
+      "error": null
+    },
+    {
+      "id": "Q02",
+      "question": "青鸟科技容器化部署中，镜像仓库最终选了什么方案？为什么？",
+      "category": "短文本检索",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 4,
+      "matchRatio": "0.50",
+      "matched": [
+        "Harbor",
+        "Trivy"
+      ],
+      "missed": [
+        "镜像扫描",
+        "CI流水线"
+      ],
+      "answerPreview": "# 青鸟科技容器化部署中镜像仓库最终选型及原因\n\n- **最终方案**：Harbor v2.10  \n- **原因**：\n  - 内置 Trivy 镜像安全扫描引擎  \n  - 支持镜像签名和 SBOM 生成  \n  - 可与现有 Jenkins CI 流水线无缝集成  \n  - 部署在自建 Kubernetes 集群，后端使用 Ceph RBD 存储，满足高并发拉取（日均约 12 万次）  \n ",
+      "fullAnswer": "# 青鸟科技容器化部署中镜像仓库最终选型及原因\n\n- **最终方案**：Harbor v2.10  \n- **原因**：\n  - 内置 Trivy 镜像安全扫描引擎  \n  - 支持镜像签名和 SBOM 生成  \n  - 可与现有 Jenkins CI 流水线无缝集成  \n  - 部署在自建 Kubernetes 集群，后端使用 Ceph RBD 存储，满足高并发拉取（日均约 12 万次）  \n  - Docker Hub 企业版因费用超预算（38 万元/年）被否决  \n  - AWS ECR 因跨境网络延迟高（P95 > 800ms）被否决  \n\n引用来源：[^1]《青鸟容器平台-镜像仓库选型方案》",
+      "latencyMs": 5586,
+      "error": null
+    },
+    {
+      "id": "Q03",
+      "question": "青鸟科技日志采集系统使用什么检索引擎？日均处理多少日志量？",
+      "category": "短文本检索",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 4,
+      "matchRatio": "0.50",
+      "matched": [
+        "OpenSearch",
+        "1.5TB"
+      ],
+      "missed": [
+        "Grafana Loki",
+        "ClickHouse"
+      ],
+      "answerPreview": "# 青鸟科技日志采集系统检索引擎与日均处理量\n\n- 检索引擎：`OpenSearch`（Elasticsearch 7.x 开源分支）[^1]  \n- 日均处理日志量：`1.5TB`[^1]\n\n引用来源：[^1]《青鸟日志系统-采集与检索方案》",
+      "fullAnswer": "# 青鸟科技日志采集系统检索引擎与日均处理量\n\n- 检索引擎：`OpenSearch`（Elasticsearch 7.x 开源分支）[^1]  \n- 日均处理日志量：`1.5TB`[^1]\n\n引用来源：[^1]《青鸟日志系统-采集与检索方案》",
+      "latencyMs": 3118,
+      "error": null
+    },
+    {
+      "id": "Q04",
+      "question": "青鸟科技API网关采用什么限流算法？多维度限流包括哪些维度？",
+      "category": "短文本检索",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 5,
+      "matchRatio": "0.80",
+      "matched": [
+        "滑动窗口",
+        "令牌桶",
+        "用户",
+        "租户"
+      ],
+      "missed": [
+        "每秒"
+      ],
+      "answerPreview": "# 青鸟科技API网关限流机制\n\n- 限流算法：**滑动窗口 + 令牌桶双层限流策略**  \n- 多维度限流支持以下四个维度的组合：  \n  - 用户  \n  - 租户  \n  - IP  \n  - API路径  \n\n引用来源：[^1]《青鸟API网关-限流与安全设计》",
+      "fullAnswer": "# 青鸟科技API网关限流机制\n\n- 限流算法：**滑动窗口 + 令牌桶双层限流策略**  \n- 多维度限流支持以下四个维度的组合：  \n  - 用户  \n  - 租户  \n  - IP  \n  - API路径  \n\n引用来源：[^1]《青鸟API网关-限流与安全设计》",
+      "latencyMs": 2957,
+      "error": null
+    },
+    {
+      "id": "Q05",
+      "question": "在青鸟科技2025技术峰会上，关于前端框架迁移最终做了什么决定？迁移周期多长？",
+      "category": "长文本检索",
+      "hit": true,
+      "matchedCount": 5,
+      "expectedCount": 5,
+      "matchRatio": "1.00",
+      "matched": [
+        "Vue",
+        "React",
+        "8个月",
+        "微前端",
+        "渐进式"
+      ],
+      "missed": [],
+      "answerPreview": "# 前端框架迁移决议\n\n- 最终决定：前端核心产品线从 Vue 3 逐步迁移到 React 18 + Next.js 14 技术栈，采用渐进式微前端方案（qiankun 框架），新旧应用并行运行[^1]。\n- 迁移周期：预计总迁移周期为 **8个月**[^1]。\n\n引用来源：[^1]《青鸟科技2025年度技术峰会会议纪要》",
+      "fullAnswer": "# 前端框架迁移决议\n\n- 最终决定：前端核心产品线从 Vue 3 逐步迁移到 React 18 + Next.js 14 技术栈，采用渐进式微前端方案（qiankun 框架），新旧应用并行运行[^1]。\n- 迁移周期：预计总迁移周期为 **8个月**[^1]。\n\n引用来源：[^1]《青鸟科技2025年度技术峰会会议纪要》",
+      "latencyMs": 3535,
+      "error": null
+    },
+    {
+      "id": "Q06",
+      "question": "青鸟电商平台架构演进方案中，数据库分库分表策略具体是怎样的？分片键是什么？",
+      "category": "长文本检索",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 5,
+      "matchRatio": "0.80",
+      "matched": [
+        "16个库",
+        "用户ID",
+        "哈希取模",
+        "ShardingSphere"
+      ],
+      "missed": [
+        "64张表"
+      ],
+      "answerPreview": "# 数据库分库分表策略\n\n- **分库策略**：订单数据按用户ID哈希取模分为16个库  \n- **分表策略**：每个库内按时间范围划分为64张订单表  \n- **总物理表数**：1024张  \n- **分片中间件**：Apache ShardingSphere 5.5（Proxy模式，3节点独立部署）  \n- **分片键**：`用户ID`  \n\n引用来源：[^1]《青鸟电商平台-架构演进方案》",
+      "fullAnswer": "# 数据库分库分表策略\n\n- **分库策略**：订单数据按用户ID哈希取模分为16个库  \n- **分表策略**：每个库内按时间范围划分为64张订单表  \n- **总物理表数**：1024张  \n- **分片中间件**：Apache ShardingSphere 5.5（Proxy模式，3节点独立部署）  \n- **分片键**：`用户ID`  \n\n引用来源：[^1]《青鸟电商平台-架构演进方案》",
+      "latencyMs": 3851,
+      "error": null
+    },
+    {
+      "id": "Q07",
+      "question": "青鸟数据中台建设规划中，实时计算引擎选型最终选了哪个？为什么没有选Spark Streaming？",
+      "category": "长文本检索",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 5,
+      "matchRatio": "0.40",
+      "matched": [
+        "Flink",
+        "Exactly-Once"
+      ],
+      "missed": [
+        "状态后端",
+        "毫秒级",
+        "CEP"
+      ],
+      "answerPreview": "# 实时计算引擎选型结果与Spark Streaming弃用原因\n\n- 最终选定：**Apache Flink 1.18** 作为统一实时计算引擎[^1][^2]  \n- 未选 Spark Streaming 的原因：\n  - 微批次架构导致端到端延迟较高（P99 ≈ 3.2秒），不满足低延迟要求[^2]  \n  - 仅支持 At-Least-Once 语义，无法保障 Exactly-Once 数",
+      "fullAnswer": "# 实时计算引擎选型结果与Spark Streaming弃用原因\n\n- 最终选定：**Apache Flink 1.18** 作为统一实时计算引擎[^1][^2]  \n- 未选 Spark Streaming 的原因：\n  - 微批次架构导致端到端延迟较高（P99 ≈ 3.2秒），不满足低延迟要求[^2]  \n  - 仅支持 At-Least-Once 语义，无法保障 Exactly-Once 数据一致性[^2]  \n\n引用来源：[^1]《青鸟数据中台-建设规划方案》、[^2]《青鸟数据中台-建设规划方案》",
+      "latencyMs": 3992,
+      "error": null
+    },
+    {
+      "id": "Q08",
+      "question": "青鸟安全合规整改方案中，关于数据跨境传输的具体规定是什么？谁负责审批？",
+      "category": "长文本检索",
+      "hit": true,
+      "matchedCount": 5,
+      "expectedCount": 5,
+      "matchRatio": "1.00",
+      "matched": [
+        "数据不出境",
+        "安全网关",
+        "张正阳",
+        "法务总监",
+        "AES-256-GCM"
+      ],
+      "missed": [],
+      "answerPreview": "# 数据跨境传输规定与审批责任人\n\n- 所有中国境内用户的个人数据严格遵循**数据不出境原则**  \n- 海外业务需通过**专用安全网关**做数据脱敏后外传  \n- 敏感字段使用 **AES-256-GCM 加密** 后传输  \n- 任何数据出境请求需提交《数据出境审批表》，经以下两人**双重审批**：  \n  - 数据保护官（DPO）  \n  - 法务总监（张正阳）[^1]\n\n引用来源：[^1]",
+      "fullAnswer": "# 数据跨境传输规定与审批责任人\n\n- 所有中国境内用户的个人数据严格遵循**数据不出境原则**  \n- 海外业务需通过**专用安全网关**做数据脱敏后外传  \n- 敏感字段使用 **AES-256-GCM 加密** 后传输  \n- 任何数据出境请求需提交《数据出境审批表》，经以下两人**双重审批**：  \n  - 数据保护官（DPO）  \n  - 法务总监（张正阳）[^1]\n\n引用来源：[^1]《青鸟安全合规-整改实施方案》、[^2]《青鸟安全合规-整改实施方案》",
+      "latencyMs": 4181,
+      "error": null
+    },
+    {
+      "id": "Q09",
+      "question": "青鸟科技2025年上半年研发规划中，AI助手项目的内部代号和第一阶段上线功能是什么？",
+      "category": "切分边界",
+      "hit": true,
+      "matchedCount": 3,
+      "expectedCount": 4,
+      "matchRatio": "0.75",
+      "matched": [
+        "灵犀",
+        "智能搜索",
+        "文档摘要"
+      ],
+      "missed": [
+        "意图识别"
+      ],
+      "answerPreview": "# AI助手项目信息\n\n- **内部代号**：灵犀  \n- **第一阶段上线功能**：智能搜索和文档摘要  \n\n引用来源：[^1]《青鸟科技-2025上半年研发规划》",
+      "fullAnswer": "# AI助手项目信息\n\n- **内部代号**：灵犀  \n- **第一阶段上线功能**：智能搜索和文档摘要  \n\n引用来源：[^1]《青鸟科技-2025上半年研发规划》",
+      "latencyMs": 2055,
+      "error": null
+    },
+    {
+      "id": "Q10",
+      "question": "青鸟科技Q2经营分析报告中，企业版客户的季度净增数量和MRR增长率分别是多少？",
+      "category": "切分边界",
+      "hit": true,
+      "matchedCount": 3,
+      "expectedCount": 4,
+      "matchRatio": "0.75",
+      "matched": [
+        "47家",
+        "12.5%",
+        "企业版"
+      ],
+      "missed": [
+        "238万"
+      ],
+      "answerPreview": "# Q2企业版客户关键指标\n\n- 季度净增客户数量：`47家`  \n- MRR增长率：`12.5%`\n\n引用来源：[^1]《青鸟科技-Q2经营分析报告》",
+      "fullAnswer": "# Q2企业版客户关键指标\n\n- 季度净增客户数量：`47家`  \n- MRR增长率：`12.5%`\n\n引用来源：[^1]《青鸟科技-Q2经营分析报告》",
+      "latencyMs": 2129,
+      "error": null
+    },
+    {
+      "id": "Q11",
+      "question": "青鸟科技年度产品路线图中，低代码平台产品的目标行业和首个MVP发布时间？",
+      "category": "切分边界",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 5,
+      "matchRatio": "0.80",
+      "matched": [
+        "制造业",
+        "金融业",
+        "8月",
+        "低代码"
+      ],
+      "missed": [
+        "可视化"
+      ],
+      "answerPreview": "# 低代码平台产品目标行业与首个MVP发布时间\n\n- **目标行业**：制造业、金融业  \n- **首个MVP发布时间**：8月  \n\n引用来源：[^1]《青鸟科技-年度产品路线图》",
+      "fullAnswer": "# 低代码平台产品目标行业与首个MVP发布时间\n\n- **目标行业**：制造业、金融业  \n- **首个MVP发布时间**：8月  \n\n引用来源：[^1]《青鸟科技-年度产品路线图》",
+      "latencyMs": 2241,
+      "error": null
+    },
+    {
+      "id": "Q12",
+      "question": "青鸟科技技术债务清理计划中，最老的需要下线的服务代号是什么？替代方案是什么？",
+      "category": "切分边界",
+      "hit": true,
+      "matchedCount": 3,
+      "expectedCount": 5,
+      "matchRatio": "0.60",
+      "matched": [
+        "雅典娜",
+        "Go",
+        "XXL-Job"
+      ],
+      "missed": [
+        "统一任务调度",
+        "Python"
+      ],
+      "answerPreview": "# 技术债务清理计划中最老服务信息\n\n- 最老的服务代号：`雅典娜`  \n- 替代方案：迁移到 `XXL-Job` 分布式任务调度平台，并用 `Go` 语言重写核心调度逻辑  \n\n引用来源：[^1]《青鸟科技-技术债务清理计划》",
+      "fullAnswer": "# 技术债务清理计划中最老服务信息\n\n- 最老的服务代号：`雅典娜`  \n- 替代方案：迁移到 `XXL-Job` 分布式任务调度平台，并用 `Go` 语言重写核心调度逻辑  \n\n引用来源：[^1]《青鸟科技-技术债务清理计划》",
+      "latencyMs": 2428,
+      "error": null
+    },
+    {
+      "id": "Q13",
+      "question": "玄武边缘计算平台使用什么消息队列来处理设备到云端的数据同步？为什么选它？",
+      "category": "多笔记干扰",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 4,
+      "matchRatio": "1.00",
+      "matched": [
+        "EMQX",
+        "MQTT",
+        "离线消息",
+        "边缘"
+      ],
+      "missed": [],
+      "answerPreview": "# 玄武边缘计算平台消息队列选型\n\n- 使用的消息队列：**EMQX 5.3**  \n- 选用原因：\n  - 原生支持 MQTT 协议，适配工业物联网设备通信需求；\n  - 在资源受限的 ARM64 边缘网关上，CPU 和内存开销仅为 Kafka 的 1/8；\n  - 内置规则引擎支持边缘侧数据预处理与过滤，降低云端无效数据上传量；\n  - 支持离线消息持久化至本地 SQLite，网络恢复后自动续",
+      "fullAnswer": "# 玄武边缘计算平台消息队列选型\n\n- 使用的消息队列：**EMQX 5.3**  \n- 选用原因：\n  - 原生支持 MQTT 协议，适配工业物联网设备通信需求；\n  - 在资源受限的 ARM64 边缘网关上，CPU 和内存开销仅为 Kafka 的 1/8；\n  - 内置规则引擎支持边缘侧数据预处理与过滤，降低云端无效数据上传量；\n  - 支持离线消息持久化至本地 SQLite，网络恢复后自动续传。\n\n```text\nEMQX 5.3\n```\n\n引用来源：[^1]《玄武边缘计算平台-技术架构》",
+      "latencyMs": 4728,
+      "error": null
+    },
+    {
+      "id": "Q14",
+      "question": "玄武物联网数据采集系统使用什么时序数据库存储传感器数据？",
+      "category": "多笔记干扰",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 4,
+      "matchRatio": "0.50",
+      "matched": [
+        "TDengine",
+        "时序"
+      ],
+      "missed": [
+        "10倍",
+        "IoT"
+      ],
+      "answerPreview": "# 数据库选型\n\n玄武物联网数据采集系统使用 **TDengine 3.0** 时序数据库存储传感器数据[^1]。\n\n```sql\nTDengine 3.0\n```\n\n引用来源：[^1]《玄武物联网数据采集系统》",
+      "fullAnswer": "# 数据库选型\n\n玄武物联网数据采集系统使用 **TDengine 3.0** 时序数据库存储传感器数据[^1]。\n\n```sql\nTDengine 3.0\n```\n\n引用来源：[^1]《玄武物联网数据采集系统》",
+      "latencyMs": 2290,
+      "error": null
+    },
+    {
+      "id": "Q15",
+      "question": "玄武实时监控系统独创了什么告警算法？与传统固定阈值相比有什么优势？",
+      "category": "多笔记干扰",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 4,
+      "matchRatio": "1.00",
+      "matched": [
+        "动态基线",
+        "季节性分解",
+        "自动",
+        "Prophet"
+      ],
+      "missed": [],
+      "answerPreview": "# 玄武实时监控系统告警算法\n\n- 独创告警算法：**基于动态基线算法的智能告警引擎**，采用 **Prophet 时序预测模型**，支持季节性分解（识别每日/每周/节假日周期）并动态生成自适应阈值区间[^1]。\n\n- 相比传统固定阈值的优势：\n  - 误报率从 56% 降至 12%，**降低 78%**；\n  - 告警响应时间从平均 15 分钟缩短至 3 分钟；\n  - 动态基线每 5 分钟自动",
+      "fullAnswer": "# 玄武实时监控系统告警算法\n\n- 独创告警算法：**基于动态基线算法的智能告警引擎**，采用 **Prophet 时序预测模型**，支持季节性分解（识别每日/每周/节假日周期）并动态生成自适应阈值区间[^1]。\n\n- 相比传统固定阈值的优势：\n  - 误报率从 56% 降至 12%，**降低 78%**；\n  - 告警响应时间从平均 15 分钟缩短至 3 分钟；\n  - 动态基线每 5 分钟自动更新，适配业务高低峰自然波动，避免人工设阈值导致的高误报。\n\n引用来源：[^1]《玄武实时监控系统-智能告警》",
+      "latencyMs": 4735,
+      "error": null
+    },
+    {
+      "id": "Q16",
+      "question": "玄武智能运维平台的核心故障自愈引擎叫什么？能在多少秒内完成根因定位？",
+      "category": "多笔记干扰",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 4,
+      "matchRatio": "1.00",
+      "matched": [
+        "天眼",
+        "30秒",
+        "AIOps",
+        "根因"
+      ],
+      "missed": [],
+      "answerPreview": "# 玄武智能运维平台核心故障自愈引擎信息\n\n- 核心故障自愈引擎名称：`天眼`  \n- 根因定位耗时：`30秒`\n\n引用来源：[^1]《玄武智能运维平台-AIOps引擎》",
+      "fullAnswer": "# 玄武智能运维平台核心故障自愈引擎信息\n\n- 核心故障自愈引擎名称：`天眼`  \n- 根因定位耗时：`30秒`\n\n引用来源：[^1]《玄武智能运维平台-AIOps引擎》",
+      "latencyMs": 2483,
+      "error": null
+    },
+    {
+      "id": "Q17",
+      "question": "青鸟科技支付引擎使用什么关系型数据库存储核心交易数据？",
+      "category": "语义等价",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 3,
+      "matchRatio": "0.67",
+      "matched": [
+        "MySQL",
+        "8.0.35"
+      ],
+      "missed": [
+        "InnoDB"
+      ],
+      "answerPreview": "# 数据库选型结论\n\n青鸟科技支付引擎使用 **MySQL 8.0.35** 作为核心交易数据存储。\n\n```sql\nMySQL 8.0.35\n```\n\n引用来源：[^1]《青鸟支付引擎-数据存储选型》",
+      "fullAnswer": "# 数据库选型结论\n\n青鸟科技支付引擎使用 **MySQL 8.0.35** 作为核心交易数据存储。\n\n```sql\nMySQL 8.0.35\n```\n\n引用来源：[^1]《青鸟支付引擎-数据存储选型》",
+      "latencyMs": 2618,
+      "error": null
+    },
+    {
+      "id": "Q18",
+      "question": "青鸟科技的用户画像平台采用了什么独创引擎来洞察客户行为？标签体系分几层？",
+      "category": "语义等价",
+      "hit": true,
+      "matchedCount": 2,
+      "expectedCount": 4,
+      "matchRatio": "0.50",
+      "matched": [
+        "客户洞察引擎",
+        "5层"
+      ],
+      "missed": [
+        "实时标签",
+        "OneID"
+      ],
+      "answerPreview": "# 青鸟科技用户画像平台技术要点\n\n- 独创引擎：**客户洞察引擎**  \n- 标签体系层级：**5层**（原始数据层、事实标签层、模型标签层、预测标签层、业务标签层）\n\n引用来源：[^1]《青鸟用户画像平台-技术设计》",
+      "fullAnswer": "# 青鸟科技用户画像平台技术要点\n\n- 独创引擎：**客户洞察引擎**  \n- 标签体系层级：**5层**（原始数据层、事实标签层、模型标签层、预测标签层、业务标签层）\n\n引用来源：[^1]《青鸟用户画像平台-技术设计》",
+      "latencyMs": 2755,
+      "error": null
+    },
+    {
+      "id": "Q19",
+      "question": "青鸟科技使用什么工具做动态配置管理？支持哪些核心特性？",
+      "category": "语义等价",
+      "hit": true,
+      "matchedCount": 4,
+      "expectedCount": 4,
+      "matchRatio": "1.00",
+      "matched": [
+        "Nacos",
+        "热更新",
+        "灰度发布",
+        "配置回滚"
+      ],
+      "missed": [],
+      "answerPreview": "# 动态配置管理工具及核心特性\n\n青鸟科技使用 **Nacos 2.3** 作为动态配置管理工具[^1]。\n\n支持的核心特性包括：\n\n- 配置热更新：应用通过 `@RefreshScope` 注解无需重启即可加载新配置  \n- 灰度发布：通过配置的 beta IP 名单实现配置灰度推送  \n- 配置回滚：保留 30 天配置历史版本，支持一键回滚到任意历史版本  \n- 敏感配置加密：通过 Jasyp",
+      "fullAnswer": "# 动态配置管理工具及核心特性\n\n青鸟科技使用 **Nacos 2.3** 作为动态配置管理工具[^1]。\n\n支持的核心特性包括：\n\n- 配置热更新：应用通过 `@RefreshScope` 注解无需重启即可加载新配置  \n- 灰度发布：通过配置的 beta IP 名单实现配置灰度推送  \n- 配置回滚：保留 30 天配置历史版本，支持一键回滚到任意历史版本  \n- 敏感配置加密：通过 Jasypt 加密存储  \n\n引用来源：[^1]《青鸟配置管理中心-架构文档》",
+      "latencyMs": 3848,
+      "error": null
+    },
+    {
+      "id": "Q20",
+      "question": "青鸟科技内部用什么框架进行定时任务的分布式调度和编排？支持多少任务量？",
+      "category": "语义等价",
+      "hit": false,
+      "matchedCount": 2,
+      "expectedCount": 5,
+      "matchRatio": "0.40",
+      "matched": [
+        "XXL-Job",
+        "2万"
+      ],
+      "missed": [
+        "分片",
+        "失败重试",
+        "Cron"
+      ],
+      "answerPreview": "# 定时任务调度框架与任务量\n\n- 青鸟科技内部使用 **XXL-Job 2.4** 作为分布式任务调度框架[^1]  \n- 支持任务总量超过 **2万个**，日均调度执行量约 **150万次**[^1]\n\n引用来源：[^1]《青鸟任务调度平台-系统设计》",
+      "fullAnswer": "# 定时任务调度框架与任务量\n\n- 青鸟科技内部使用 **XXL-Job 2.4** 作为分布式任务调度框架[^1]  \n- 支持任务总量超过 **2万个**，日均调度执行量约 **150万次**[^1]\n\n引用来源：[^1]《青鸟任务调度平台-系统设计》",
+      "latencyMs": 2777,
+      "error": null
+    },
+    {
+      "id": "Q21",
+      "question": "青鸟科技全面技术架构白皮书中，关于容灾方案的具体指标要求是什么？异地多活部署在哪些城市？",
+      "category": "超长文本",
+      "hit": true,
+      "matchedCount": 7,
+      "expectedCount": 7,
+      "matchRatio": "1.00",
+      "matched": [
+        "RPO",
+        "10秒",
+        "RTO",
+        "5分钟",
+        "上海",
+        "广州",
+        "异地多活"
+      ],
+      "missed": [],
+      "answerPreview": "# 容灾方案指标与异地多活部署城市\n\n- **RPO（恢复点目标）**：10秒  \n- **RTO（恢复时间目标）**：5分钟  \n- **异地多活部署城市**：上海（华东主站点）、广州（华南主站点）；灾备站点在北京  \n\n引用来源：[^1]《青鸟科技-全面技术架构白皮书》、[^3]《青鸟电商平台-架构演进方案》",
+      "fullAnswer": "# 容灾方案指标与异地多活部署城市\n\n- **RPO（恢复点目标）**：10秒  \n- **RTO（恢复时间目标）**：5分钟  \n- **异地多活部署城市**：上海（华东主站点）、广州（华南主站点）；灾备站点在北京  \n\n引用来源：[^1]《青鸟科技-全面技术架构白皮书》、[^3]《青鸟电商平台-架构演进方案》",
+      "latencyMs": 3195,
+      "error": null
+    },
+    {
+      "id": "Q22",
+      "question": "青鸟科技2025年度战略规划书中，关于海外业务拓展的目标市场是哪些？预计什么时候开始？用什么部署模式？",
+      "category": "超长文本",
+      "hit": true,
+      "matchedCount": 5,
+      "expectedCount": 5,
+      "matchRatio": "1.00",
+      "matched": [
+        "东南亚",
+        "新加坡",
+        "Q4",
+        "AWS",
+        "合规"
+      ],
+      "missed": [],
+      "answerPreview": "# 海外业务拓展关键信息\n\n- **目标市场**：东南亚，首选新加坡作为区域总部和数据合规枢纽[^1]  \n- **启动时间**：2025年Q4在新加坡设立办公室并完成本地团队组建[^1]  \n- **部署模式**：使用 `AWS` 新加坡 Region (`ap-southeast-1`) 进行本地化部署，满足 PDPA/PDPL 等数据驻留合规要求[^1][^2]\n\n引用来源：[^1]《青鸟科",
+      "fullAnswer": "# 海外业务拓展关键信息\n\n- **目标市场**：东南亚，首选新加坡作为区域总部和数据合规枢纽[^1]  \n- **启动时间**：2025年Q4在新加坡设立办公室并完成本地团队组建[^1]  \n- **部署模式**：使用 `AWS` 新加坡 Region (`ap-southeast-1`) 进行本地化部署，满足 PDPA/PDPL 等数据驻留合规要求[^1][^2]\n\n引用来源：[^1]《青鸟科技2025年度战略规划书》、[^2]《青鸟科技2025年度战略规划书》",
+      "latencyMs": 4197,
+      "error": null
+    },
+    {
+      "id": "Q23",
+      "question": "青鸟科技数字化转型实施方案中，关于组织架构调整的核心变化是什么？新设立了什么部门？",
+      "category": "超长文本",
+      "hit": true,
+      "matchedCount": 5,
+      "expectedCount": 5,
+      "matchRatio": "1.00",
+      "matched": [
+        "平台研发中心",
+        "数据委员会",
+        "扁平化",
+        "敏捷",
+        "虚拟"
+      ],
+      "missed": [],
+      "answerPreview": "# 组织架构调整的核心变化与新设部门\n\n- 新设立**平台研发中心**，由原各事业部的平台团队合并而成，负责统一技术平台的建设、运营和SRE  \n- 新设立**数据委员会**，由CTO直接领导，负责制定数据标准、数据治理策略和数据质量KPI  \n- 推行**扁平化组织**：研发团队从4级汇报压缩为3级（工程师 → Tech Lead → 总监）  \n- 全面推行**敏捷开发**：所有产品团队转向S",
+      "fullAnswer": "# 组织架构调整的核心变化与新设部门\n\n- 新设立**平台研发中心**，由原各事业部的平台团队合并而成，负责统一技术平台的建设、运营和SRE  \n- 新设立**数据委员会**，由CTO直接领导，负责制定数据标准、数据治理策略和数据质量KPI  \n- 推行**扁平化组织**：研发团队从4级汇报压缩为3级（工程师 → Tech Lead → 总监）  \n- 全面推行**敏捷开发**：所有产品团队转向Scrum双周迭代，每季度一次PI Planning  \n- 试点**虚拟专家小组**：跨团队抽调专家组成短期攻坚小组  \n\n```text\n平台研发中心、数据委员会\n```\n\n引用来源：[^1]《青鸟科技-数字化转型实施方案》、[^2]《青鸟科技-数字化转型实施方案》",
+      "latencyMs": 5171,
+      "error": null
+    },
+    {
+      "id": "Q24",
+      "question": "青鸟推荐引擎中，热门内容降权使用的那个Lua脚本，限流的时间窗口是多少秒？",
+      "category": "代码混合",
+      "hit": true,
+      "matchedCount": 3,
+      "expectedCount": 6,
+      "matchRatio": "0.50",
+      "matched": [
+        "Lua",
+        "滑动窗口",
+        "600"
+      ],
+      "missed": [
+        "ZSET",
+        "毫秒",
+        "衰减权重"
+      ],
+      "answerPreview": "# 青鸟推荐引擎热门内容降权Lua脚本的时间窗口\n\n- 时间窗口为 **600 秒**（即 10 分钟）\n\n```lua\nlocal window = 600000  -- 滑动窗口600秒=10分钟\n```\n\n引用来源：[^1]《青鸟推荐引擎-热门内容降权算法》、[^2]《青鸟推荐引擎-热门内容降权算法》",
+      "fullAnswer": "# 青鸟推荐引擎热门内容降权Lua脚本的时间窗口\n\n- 时间窗口为 **600 秒**（即 10 分钟）\n\n```lua\nlocal window = 600000  -- 滑动窗口600秒=10分钟\n```\n\n引用来源：[^1]《青鸟推荐引擎-热门内容降权算法》、[^2]《青鸟推荐引擎-热门内容降权算法》",
+      "latencyMs": 3248,
+      "error": null
+    },
+    {
+      "id": "Q25",
+      "question": "青鸟数据管道ETL设计文档中，Flink SQL的TOP-N取每个分类的前多少条记录？",
+      "category": "代码混合",
+      "hit": false,
+      "matchedCount": 1,
+      "expectedCount": 6,
+      "matchRatio": "0.17",
+      "matched": [
+        "3"
+      ],
+      "missed": [
+        "ROW_NUMBER",
+        "OVER",
+        "PARTITION",
+        "Watermark",
+        "分钟"
+      ],
+      "answerPreview": "# 青鸟数据管道ETL设计文档中Flink SQL的TOP-N取每个分类的前多少条记录？\n\n- 每个分类取前 **3 条** 记录。\n\n引用来源：[^1]《青鸟数据管道-ETL设计与Flink SQL实现》、[^2]《青鸟数据管道-ETL设计与Flink SQL实现》、[^4]《青鸟数据管道-ETL设计与Flink SQL实现》",
+      "fullAnswer": "# 青鸟数据管道ETL设计文档中Flink SQL的TOP-N取每个分类的前多少条记录？\n\n- 每个分类取前 **3 条** 记录。\n\n引用来源：[^1]《青鸟数据管道-ETL设计与Flink SQL实现》、[^2]《青鸟数据管道-ETL设计与Flink SQL实现》、[^4]《青鸟数据管道-ETL设计与Flink SQL实现》",
+      "latencyMs": 3323,
+      "error": null
+    }
+  ]
+}

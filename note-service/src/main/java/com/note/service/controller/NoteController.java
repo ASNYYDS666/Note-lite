@@ -9,6 +9,7 @@ import com.note.service.dto.NoteDTO;
 import com.note.service.dto.NoteQueryDTO;
 import com.note.service.service.NoteFolderService;
 import com.note.service.service.NoteService;
+import com.note.service.service.TreeCacheService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,9 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import lombok.extern.slf4j.Slf4j;  // 如果用 Lombok
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +37,7 @@ public class NoteController {
 
     private final NoteService noteService;
     private final NoteFolderService noteFolderService;
+    private final TreeCacheService treeCacheService;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -46,6 +46,7 @@ public class NoteController {
     public Result<Long> create(@RequestBody @Valid NoteDTO dto,
                                @AuthenticationPrincipal Long userId) {
         Long noteId = noteService.createNote(userId, dto);
+        treeCacheService.invalidate(userId);
         return Result.success(noteId);
     }
 
@@ -72,6 +73,7 @@ public class NoteController {
                                @Parameter(description = "true=物理删除, false=软删除移入回收站") @RequestParam(defaultValue = "false") boolean permanent,
                                @AuthenticationPrincipal Long userId) {
         noteService.deleteNote(id, userId, permanent);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 
@@ -97,6 +99,7 @@ public class NoteController {
     public Result<Void> restore(@Parameter(description = "笔记ID") @PathVariable Long id,
                                 @AuthenticationPrincipal Long userId) {
         noteService.restoreFromRecycle(id, userId);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 
@@ -186,7 +189,72 @@ public class NoteController {
     @GetMapping("/tree")
     @Operation(summary = "获取文件夹+笔记树（驱动前端目录树）")
     public Result<NoteTreeVO> getNoteTree(@AuthenticationPrincipal Long userId) {
-        return Result.success(noteService.getNoteTree(userId));
+        String key = CacheConstants.NOTE_TREE_PREFIX + userId;
+
+        // 1. 快速取缓存
+        String cached = stringRedisTemplate.opsForValue().get(key);
+        if (cached != null) {
+            try {
+                return Result.success(objectMapper.readValue(cached, NoteTreeVO.class));
+            } catch (JsonProcessingException e) {
+                log.warn("Tree缓存反序列化失败, key={}", key, e);
+                stringRedisTemplate.delete(key);
+            }
+        }
+
+        // 2. SETNX 防缓存击穿（只让 1 个请求查库）
+        String lockKey = "LOCK:" + key;
+        Boolean locked = stringRedisTemplate.opsForValue()
+                .setIfAbsent(lockKey, "1", 2, TimeUnit.SECONDS);
+
+        if (Boolean.TRUE.equals(locked)) {
+            try {
+                // Double-Check：获得锁的瞬间可能其他线程已重建缓存
+                cached = stringRedisTemplate.opsForValue().get(key);
+                if (cached != null) {
+                    try {
+                        return Result.success(objectMapper.readValue(cached, NoteTreeVO.class));
+                    } catch (JsonProcessingException e) {
+                        stringRedisTemplate.delete(key);
+                    }
+                }
+
+                // 真正查库（只有 1 个线程执行）
+                NoteTreeVO tree = noteService.getNoteTree(userId);
+                try {
+                    stringRedisTemplate.opsForValue().set(key,
+                            objectMapper.writeValueAsString(tree),
+                            CacheConstants.ttlWithJitter(CacheConstants.NOTE_TREE_TTL_SECONDS),
+                            TimeUnit.SECONDS);
+                } catch (JsonProcessingException e) {
+                    log.error("Tree缓存序列化失败, userId={}", userId, e);
+                }
+                return Result.success(tree);
+            } finally {
+                stringRedisTemplate.delete(lockKey);
+            }
+        } else {
+            // 自旋等待缓存被锁持有者重建（最多 500ms，每 50ms 重试）
+            for (int i = 0; i < 10; i++) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                cached = stringRedisTemplate.opsForValue().get(key);
+                if (cached != null) {
+                    try {
+                        return Result.success(objectMapper.readValue(cached, NoteTreeVO.class));
+                    } catch (JsonProcessingException e) {
+                        break;
+                    }
+                }
+            }
+            // 降级查库（锁超时或缓存仍为空）
+            log.warn("Tree缓存击穿等待超时, userId={}, 降级查库", userId);
+            return Result.success(noteService.getNoteTree(userId));
+        }
     }
 
     @PutMapping("/{id}/move")
@@ -195,6 +263,7 @@ public class NoteController {
                                   @Parameter(description = "目标文件夹ID，null表示根目录") @RequestParam(required = false) Long folderId,
                                   @AuthenticationPrincipal Long userId) {
         noteService.moveNote(id, userId, folderId);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 
@@ -204,6 +273,7 @@ public class NoteController {
                                     @Parameter(description = "新标题") @RequestParam String title,
                                     @AuthenticationPrincipal Long userId) {
         noteService.renameNote(id, userId, title);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 
@@ -215,6 +285,7 @@ public class NoteController {
                                      @Parameter(description = "文件夹名称") @RequestParam String name,
                                      @AuthenticationPrincipal Long userId) {
         Long folderId = noteFolderService.createFolder(userId, parentId, name);
+        treeCacheService.invalidate(userId);
         return Result.success(folderId);
     }
 
@@ -225,6 +296,7 @@ public class NoteController {
                                       @Parameter(description = "目标父文件夹ID(可选)") @RequestParam(required = false) Long parentId,
                                       @AuthenticationPrincipal Long userId) {
         noteFolderService.updateFolder(userId, id, name, parentId);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 
@@ -233,6 +305,7 @@ public class NoteController {
     public Result<Void> deleteFolder(@Parameter(description = "文件夹ID") @PathVariable Long id,
                                       @AuthenticationPrincipal Long userId) {
         noteFolderService.deleteFolder(userId, id);
+        treeCacheService.invalidate(userId);
         return Result.success();
     }
 }

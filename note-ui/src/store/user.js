@@ -5,19 +5,8 @@ import { useAIStore } from '@/store/ai'
 
 export const useUserStore = defineStore('user', () => {
   const storedToken = localStorage.getItem('token')
-  const fallbackToken = storedToken || 'dev-preview-token'
-
-  // 确保 token 同步到 localStorage（chat.js SSE 请求从 localStorage 读取）
-  if (!storedToken) {
-    localStorage.setItem('token', fallbackToken)
-  }
-
-  const token = ref(fallbackToken)
-  const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null') || {
-    username: 'Developer',
-    email: 'dev@note-lite.local',
-    createdAt: '2026-06-01'
-  })
+  const token = ref(storedToken || '')
+  const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
 
   const isLoggedIn = computed(() => !!token.value)
 

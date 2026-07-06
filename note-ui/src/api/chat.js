@@ -99,21 +99,3 @@ export function createSSEParser() {
   }
 }
 
-/**
- * @deprecated 使用 createSSEParser() 代替，避免跨 chunk 行拆分导致 token 丢失
- */
-export function parseSSEChunk(chunk) {
-  const results = []
-  const lines = chunk.split('\n')
-  for (const line of lines) {
-    if (!line.startsWith('data:')) continue
-    const jsonStr = line.slice(5).trim()
-    if (!jsonStr) continue
-    try {
-      results.push(JSON.parse(jsonStr))
-    } catch (e) {
-      /* ignore malformed JSON */
-    }
-  }
-  return results
-}

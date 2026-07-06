@@ -39,13 +39,23 @@ const workspace = useWorkspaceStore()
 const keyword = ref('')
 
 function flattenTree(tree, result = []) {
-  if (!Array.isArray(tree)) return result
-  for (const item of tree) {
-    if (!item.isFolder) {
-      result.push({ id: item.id, title: item.name || item.title })
+  if (!tree || typeof tree !== 'object') return result
+
+  // 收集当前层级笔记 (根层 NoteTreeVO.notes / 文件夹层 FolderNode.notes)
+  if (Array.isArray(tree.notes)) {
+    for (const note of tree.notes) {
+      result.push({ id: note.id, title: note.title })
     }
-    if (item.children) flattenTree(item.children, result)
   }
+
+  // 递归子节点 (根层 NoteTreeVO.folders / 文件夹层 FolderNode.children)
+  const children = tree.folders || tree.children
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      flattenTree(child, result)
+    }
+  }
+
   return result
 }
 
@@ -152,12 +162,5 @@ function handleSearch() {
   font-size: 14px;
   color: var(--on-surface-variant);
   flex-shrink: 0;
-}
-
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--secondary-fixed);
-  border-radius: 10px;
 }
 </style>

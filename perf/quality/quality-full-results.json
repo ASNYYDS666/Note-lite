@@ -1,0 +1,362 @@
+{
+  "testDate": "2026-06-29",
+  "model": "qwen-plus",
+  "profileId": 5,
+  "chunkConfig": {
+    "size": 500,
+    "overlap": 100
+  },
+  "retrievalConfig": {
+    "topK": 5,
+    "scoreThreshold": 0.3
+  },
+  "summary": {
+    "totalQuestions": 15,
+    "passed": 14,
+    "failed": 1,
+    "questionHitRate": "93%",
+    "keywordHitRate": "88%",
+    "totalDurationMs": 82069,
+    "latencyP50": 3186,
+    "latencyP95": 3938,
+    "latencyMin": 2309,
+    "latencyMax": 3938,
+    "byCategory": {
+      "短文本检索": {
+        "hit": "3/3",
+        "kwHit": "7/7",
+        "avgLatMs": 3072
+      },
+      "长文本检索": {
+        "hit": "2/3",
+        "kwHit": "7/11",
+        "avgLatMs": 3374
+      },
+      "切分边界": {
+        "hit": "3/3",
+        "kwHit": "7/7",
+        "avgLatMs": 3499
+      },
+      "多笔记干扰": {
+        "hit": "3/3",
+        "kwHit": "4/4",
+        "avgLatMs": 2891
+      },
+      "语义等价": {
+        "hit": "3/3",
+        "kwHit": "4/4",
+        "avgLatMs": 2846
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "Q01",
+      "cat": "短文本检索",
+      "question": "青鸟OA系统采用了什么用户认证方式？",
+      "expectedKw": [
+        "双因子认证",
+        "短信验证码",
+        "指纹识别"
+      ],
+      "matched": [
+        "双因子认证",
+        "短信验证码",
+        "指纹识别"
+      ],
+      "missed": [],
+      "hitRate": "3/3",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3938,
+      "answer": "# 青鸟OA系统用户认证方式\n\n青鸟OA系统采用**双因子认证机制**，具体包括：\n- 短信验证码（6位数字，通过阿里云短信服务发送）\n- 指纹识别（对接华为指纹识别SDK v3.2.1）\n\nToken管理使用JWT，有效期为30分钟，并支持refresh token自动续期[^1]。\n\n引用来源：[^1]《青鸟OA系统-认证模块设计》",
+      "error": null
+    },
+    {
+      "id": "Q02",
+      "cat": "短文本检索",
+      "question": "青鸟ERP系统的数据备份使用什么存储？",
+      "expectedKw": [
+        "对象存储",
+        "OSS"
+      ],
+      "matched": [
+        "对象存储",
+        "OSS"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2451,
+      "answer": "# 青鸟ERP系统数据备份使用的存储\n\n- 热备份：本地 NVMe SSD  \n- 温备份：阿里云 OSS 对象存储  \n- 冷备份：磁带库  \n\n引用来源：[^1]《青鸟ERP系统-数据备份策略》",
+      "error": null
+    },
+    {
+      "id": "Q03",
+      "cat": "短文本检索",
+      "question": "青鸟CRM系统的消息推送使用什么服务？",
+      "expectedKw": [
+        "极光推送",
+        "JPush"
+      ],
+      "matched": [
+        "极光推送",
+        "JPush"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2828,
+      "answer": "# 青鸟CRM系统的消息推送服务\n\n青鸟CRM系统使用 **极光推送（JPush）v4.2** 作为统一的移动端消息推送平台[^1]。\n\n引用来源：[^1]《青鸟CRM系统-消息推送方案》",
+      "error": null
+    },
+    {
+      "id": "Q04",
+      "cat": "长文本检索",
+      "question": "青鸟科技2024年度技术规划会议，关于数据库迁移做了什么决定？",
+      "expectedKw": [
+        "PostgreSQL",
+        "MySQL",
+        "Q3",
+        "迁移"
+      ],
+      "matched": [
+        "迁移"
+      ],
+      "missed": [
+        "PostgreSQL",
+        "MySQL",
+        "Q3"
+      ],
+      "hitRate": "1/4",
+      "ratio": 0.25,
+      "hit": false,
+      "latencyMs": 3167,
+      "answer": "# 数据库迁移决定\n\n会议未涉及数据库迁移决策，仅确定了**缓存方案**继续使用 Redis 7.2 Cluster 模式[^1]。\n\n引用来源：[^1]《青鸟科技2024年度技术规划会议纪要》",
+      "error": null
+    },
+    {
+      "id": "Q05",
+      "cat": "长文本检索",
+      "question": "青鸟电商平台决定将消息中间件从什么迁移到什么？延迟降低了多少？",
+      "expectedKw": [
+        "Kafka",
+        "Redpanda",
+        "12ms",
+        "4.2"
+      ],
+      "matched": [
+        "Kafka",
+        "Redpanda",
+        "12ms"
+      ],
+      "missed": [
+        "4.2"
+      ],
+      "hitRate": "3/4",
+      "ratio": 0.75,
+      "hit": true,
+      "latencyMs": 3588,
+      "answer": "# 消息中间件迁移详情\n\n- 迁移前：`Kafka 3.5`  \n- 迁移后：`Redpanda 23.3`  \n- 延迟降低：从平均 `85ms` 降至 `12ms`，降低 `73ms`\n\n引用来源：[^2]《青鸟电商平台架构设计文档V3》",
+      "error": null
+    },
+    {
+      "id": "Q06",
+      "cat": "长文本检索",
+      "question": "青鸟科技安全合规手册中，关于AI项目的特殊规定是什么？",
+      "expectedKw": [
+        "伦理委员会",
+        "李浩然",
+        "脱敏"
+      ],
+      "matched": [
+        "伦理委员会",
+        "李浩然",
+        "脱敏"
+      ],
+      "missed": [],
+      "hitRate": "3/3",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3369,
+      "answer": "# AI项目特殊规定\n\n- 所有新立项的AI相关项目必须通过伦理委员会审批[^1]  \n- AI模型训练数据必须脱敏后使用，禁止使用未授权的外部数据集[^1]  \n- AI伦理委员会已成立，由CTO李浩然担任主席[^1]\n\n引用来源：[^1]《青鸟科技安全合规手册2024》",
+      "error": null
+    },
+    {
+      "id": "Q07",
+      "cat": "切分边界",
+      "question": "青鸟科技的新一代产品项目代号和预算金额是多少？",
+      "expectedKw": [
+        "凤凰计划",
+        "850",
+        "万"
+      ],
+      "matched": [
+        "凤凰计划",
+        "850",
+        "万"
+      ],
+      "missed": [],
+      "hitRate": "3/3",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3581,
+      "answer": "# 新一代产品项目代号与预算金额\n\n- **凤凰计划**：预算为 `850万元` 人民币 [^1]  \n- **银河战舰**：预算为 `1200万元` 人民币 [^2]\n\n引用来源：[^1]《青鸟科技产品研发规划2024》、[^2]《青鸟科技Q3季度经营报告》",
+      "error": null
+    },
+    {
+      "id": "Q08",
+      "cat": "切分边界",
+      "question": "青鸟科技Q3季度启动的新项目代号和预算是多少？",
+      "expectedKw": [
+        "银河战舰",
+        "1200万"
+      ],
+      "matched": [
+        "银河战舰",
+        "1200万"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3731,
+      "answer": "# 青鸟科技Q3季度启动的新项目信息\n\n- 项目代号：**银河战舰**  \n- 预算：**1200万元人民币**\n\n```text\n代号：银河战舰\n预算：1200万元\n```\n\n引用来源：[^1]《青鸟科技Q3季度经营报告》",
+      "error": null
+    },
+    {
+      "id": "Q09",
+      "cat": "切分边界",
+      "question": "青鸟科技2024年度战略规划中，安全产品线的代号和预计年度合同额是多少？",
+      "expectedKw": [
+        "玄武之盾",
+        "3000万"
+      ],
+      "matched": [
+        "玄武之盾",
+        "3000万"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3186,
+      "answer": "# 安全产品线信息\n\n- 代号：`玄武之盾`  \n- 预计年度合同额：`3000万元`\n\n引用来源：[^1]《青鸟科技2024年度战略规划》",
+      "error": null
+    },
+    {
+      "id": "Q10",
+      "cat": "多笔记干扰",
+      "question": "麒麟微服务平台使用什么消息队列进行服务间通信？",
+      "expectedKw": [
+        "RocketMQ"
+      ],
+      "matched": [
+        "RocketMQ"
+      ],
+      "missed": [],
+      "hitRate": "1/1",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2951,
+      "answer": "# 麒麟微服务平台消息队列\n\n麒麟微服务平台使用 **Apache RocketMQ 5.1.0** 进行服务间通信。\n\n```text\nApache RocketMQ 5.1.0\n```\n\n引用来源：[^1]《麒麟微服务平台-技术选型》",
+      "error": null
+    },
+    {
+      "id": "Q11",
+      "cat": "多笔记干扰",
+      "question": "麒麟数据治理平台独创了什么引擎来自动识别数据质量问题？",
+      "expectedKw": [
+        "智能数据画像"
+      ],
+      "matched": [
+        "智能数据画像"
+      ],
+      "missed": [],
+      "hitRate": "1/1",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2309,
+      "answer": "# 麒麟数据治理平台独创的引擎\n\n- 智能数据画像引擎[^1]\n\n引用来源：[^1]《麒麟数据治理方案V2》",
+      "error": null
+    },
+    {
+      "id": "Q12",
+      "cat": "多笔记干扰",
+      "question": "麒麟监控平台的核心创新是什么？误报率降低了多少？",
+      "expectedKw": [
+        "自适应阈值",
+        "78%"
+      ],
+      "matched": [
+        "自适应阈值",
+        "78%"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3413,
+      "answer": "# 麒麟监控平台的核心创新及误报率降低情况\n\n- 核心创新：**自适应阈值算法**（基于历史数据的时序预测，自动调整告警阈值）  \n- 误报率降低了：**78%**\n\n引用来源：[^1]《麒麟监控告警体系设计》",
+      "error": null
+    },
+    {
+      "id": "Q13",
+      "cat": "语义等价",
+      "question": "青鸟科技的新支付系统用了什么关系型数据库？",
+      "expectedKw": [
+        "MySQL"
+      ],
+      "matched": [
+        "MySQL"
+      ],
+      "missed": [],
+      "hitRate": "1/1",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2380,
+      "answer": "# 数据库选型\n\n青鸟科技的新支付系统使用了 **MySQL 8.0.35** 作为主关系型数据库[^1]。\n\n引用来源：[^1]《青鸟支付系统-架构设计》",
+      "error": null
+    },
+    {
+      "id": "Q14",
+      "cat": "语义等价",
+      "question": "青鸟推荐引擎使用什么技术做分布式缓存加速？",
+      "expectedKw": [
+        "Alluxio"
+      ],
+      "matched": [
+        "Alluxio"
+      ],
+      "missed": [],
+      "hitRate": "1/1",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 3312,
+      "answer": "# 分布式缓存加速技术\n\n青鸟推荐引擎使用 **Alluxio 2.9** 做分布式数据缓存加速[^1]。\n\n引用来源：[^1]《青鸟推荐引擎技术方案》",
+      "error": null
+    },
+    {
+      "id": "Q15",
+      "cat": "语义等价",
+      "question": "青鸟搜索服务计划将检索引擎迁移到什么？新的中文分词工具是什么？",
+      "expectedKw": [
+        "Meilisearch",
+        "jieba"
+      ],
+      "matched": [
+        "Meilisearch",
+        "jieba"
+      ],
+      "missed": [],
+      "hitRate": "2/2",
+      "ratio": 1.0,
+      "hit": true,
+      "latencyMs": 2848,
+      "answer": "# 搜索服务优化变更\n\n- 检索引擎迁移目标：`Meilisearch 1.7`  \n- 新的中文分词工具：`jieba 0.42`\n\n引用来源：[^1]《青鸟搜索服务优化方案》",
+      "error": null
+    }
+  ]
+}

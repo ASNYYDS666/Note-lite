@@ -1,0 +1,475 @@
+{
+  "info": {
+    "name": "Note-lite 回归测试",
+    "description": "核心 API 冒烟回归集合。运行前请确保 Docker Compose 已启动、应用在 localhost:8080 运行。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "noteId", "value": "" },
+    { "key": "folderId", "value": "" },
+    { "key": "shareCode", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. 前置：注册 & 登录",
+      "item": [
+        {
+          "name": "注册新用户",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('注册成功 code=200', () => {",
+                  "  pm.expect(pm.response.json().code).to.eql(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const rand = Math.random().toString(36).substring(2, 8);",
+                  "pm.variables.set('test_username', 'pman_' + rand);",
+                  "pm.variables.set('test_email', 'pman_' + rand + '@test.com');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"password\": \"Test123456\",\n  \"email\": \"{{test_email}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/user/register", "host": ["{{base_url}}"], "path": ["api", "v1", "user", "register"] }
+          }
+        },
+        {
+          "name": "登录获取 Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('登录成功', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data.token).to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('token', json.data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"password\": \"Test123456\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/user/login", "host": ["{{base_url}}"], "path": ["api", "v1", "user", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. 笔记 CRUD 冒烟",
+      "item": [
+        {
+          "name": "创建笔记",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('创建成功，返回 noteId', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data).to.be.a('number').and.above(0);",
+                  "});",
+                  "pm.collectionVariables.set('noteId', json.data);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"测试笔记_\" + new Date().toISOString(),\n  \"content\": \"# AI 功能测试笔记\\n\\n## 摘要\\n人工智能（AI）正在改变世界。\\n\\n### 要点\\n- 机器学习\\n- 深度学习\\n- 自然语言处理\\n\\n```python\\nprint('Hello AI')\\n```\",\n  \"folderId\": null,\n  \"tags\": [\"AI\", \"测试\"]\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/note", "host": ["{{base_url}}"], "path": ["api", "v1", "note"] }
+          }
+        },
+        {
+          "name": "获取笔记详情",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('查询成功，内容完整', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data.title).to.include('测试笔记');",
+                  "  pm.expect(json.data.content).to.include('AI 功能测试笔记');",
+                  "  pm.expect(json.data.tags).to.include('ai');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/note/{{noteId}}", "host": ["{{base_url}}"], "path": ["api", "v1", "note", "{{noteId}}"] }
+          }
+        },
+        {
+          "name": "更新笔记",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('更新成功', () => {",
+                  "  pm.expect(pm.response.json().code).to.eql(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"[已更新]测试笔记\",\n  \"content\": \"# 更新后的内容\\n\\n向量化入库测试通过 ✅\",\n  \"tags\": [\"AI\", \"测试\", \"已验证\"]\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/note/{{noteId}}", "host": ["{{base_url}}"], "path": ["api", "v1", "note", "{{noteId}}"] }
+          }
+        },
+        {
+          "name": "分页查询笔记列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('分页查询成功', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data.records).to.be.an('array');",
+                  "  pm.expect(json.data.total).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/note/page?pageNum=1&pageSize=10&isDeleted=0",
+              "host": ["{{base_url}}"], "path": ["api", "v1", "note", "page"],
+              "query": [
+                { "key": "pageNum", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "isDeleted", "value": "0" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. 目录树 & 文件夹",
+      "item": [
+        {
+          "name": "创建文件夹",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('文件夹创建成功', () => { pm.expect(json.code).to.eql(200); });",
+                  "if (json.data) pm.collectionVariables.set('folderId', json.data);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"测试文件夹\",\n  \"parentId\": null\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/folder", "host": ["{{base_url}}"], "path": ["api", "v1", "folder"] }
+          }
+        },
+        {
+          "name": "获取目录树",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('目录树查询成功', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data).to.have.property('folders');",
+                  "  pm.expect(json.data).to.have.property('notes');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/note/tree", "host": ["{{base_url}}"], "path": ["api", "v1", "note", "tree"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. AI 对话（SSE 流式验证）",
+      "item": [
+        {
+          "name": "发起 AI 对话",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('SSE 连接成功（状态码 200）', () => {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "const body = pm.response.text();",
+                  "pm.test('响应包含 SSE data 字段', () => {",
+                  "  pm.expect(body).to.include('data:');",
+                  "});",
+                  "pm.test('响应包含 token 或 error 事件', () => {",
+                  "  pm.expect(body).to.match(/\"token\"|\"error\"/);",
+                  "});",
+                  "pm.test('响应以 done:true 结束', () => {",
+                  "  pm.expect(body).to.include('\"done\":true');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"什么是人工智能？请简短回答\",\n  \"scopeType\": \"ALL\",\n  \"style\": \"concise\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/chat", "host": ["{{base_url}}"], "path": ["api", "v1", "chat"] }
+          }
+        },
+        {
+          "name": "获取对话列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('对话列表查询成功', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/conversations", "host": ["{{base_url}}"], "path": ["api", "v1", "conversations"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. 分享链接",
+      "item": [
+        {
+          "name": "生成分享链接",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('分享链接生成成功', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data).to.have.property('shareCode');",
+                  "});",
+                  "if (json.data && json.data.shareCode) {",
+                  "  pm.collectionVariables.set('shareCode', json.data.shareCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"noteId\": {{noteId}}\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/share/generate", "host": ["{{base_url}}"], "path": ["api", "v1", "share", "generate"] }
+          }
+        },
+        {
+          "name": "访问分享笔记（无需认证）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('无需登录即可访问分享笔记', () => {",
+                  "  pm.expect(json.code).to.eql(200);",
+                  "  pm.expect(json.data.content).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/share/{{shareCode}}", "host": ["{{base_url}}"], "path": ["api", "v1", "share", "{{shareCode}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. 异常场景验证",
+      "item": [
+        {
+          "name": "空问题 → 参数校验失败",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('返回 400 Bad Request', () => {",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"question\": \"\",\n  \"scopeType\": \"ALL\",\n  \"style\": \"concise\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/chat", "host": ["{{base_url}}"], "path": ["api", "v1", "chat"] }
+          }
+        },
+        {
+          "name": "无需认证访问 → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('返回 401 Unauthorized', () => {",
+                  "  pm.expect(pm.response.code).to.eql(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/note/1", "host": ["{{base_url}}"], "path": ["api", "v1", "note", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. 后置清理",
+      "item": [
+        {
+          "name": "物理删除测试笔记",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('清理成功', () => { pm.expect(pm.response.code).to.eql(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/note/{{noteId}}?permanent=true", "host": ["{{base_url}}"], "path": ["api", "v1", "note", "{{noteId}}"], "query": [{ "key": "permanent", "value": "true" }] }
+          }
+        },
+        {
+          "name": "删除测试文件夹",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('文件夹清理完成', () => { pm.expect(pm.response.code).to.satisfy(c => c === 200 || c === 400); });"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/folder/{{folderId}}", "host": ["{{base_url}}"], "path": ["api", "v1", "folder", "{{folderId}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}

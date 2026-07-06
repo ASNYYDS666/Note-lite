@@ -9,35 +9,42 @@
     />
 
     <!-- Right -->
-    <template v-if="lib.profiles.value.length === 0 && lib.editorMode.value === 'idle'">
-      <ProfileEmptyState variant="no-profiles" @add="lib.startNew()" />
-    </template>
-    <template v-else-if="lib.editorMode.value === 'creating' || lib.editorMode.value === 'editing'">
-      <ProfileEditor
-        :draft="lib.draft.value"
-        :providers="lib.providers.value"
-        :isDirty="lib.isDirty.value"
-        :canApply="lib.canApply.value"
-        :isNew="lib.editorMode.value === 'creating'"
-        :refreshing="lib.refreshing.value"
-        :refreshError="lib.refreshError.value"
-        :notice="lib.notice.value"
-        :testingEmbed="lib.testingEmbed.value"
-        :embedTestResult="lib.embedTestResult.value"
-        @update="(patch) => { Object.assign(lib.draft.value, patch) }"
-        @updateModel="(i, v) => { Object.assign(lib.draft.value.models[i], v) }"
-        @removeModel="(i) => { lib.draft.value.models.splice(i, 1) }"
-        @refresh="lib.refreshRemoteModels()"
-        @apply="lib.applyDraft()"
-        @delete="lib.requestDelete(lib.draft.value.id)"
-        @dismissError="lib.refreshError.value = null"
-        @dismissNotice="lib.dismissNotice()"
-        @testEmbed="lib.testEmbed()"
-      />
-    </template>
-    <template v-else>
-      <ProfileEmptyState variant="no-selection" />
-    </template>
+    <div class="ai-model-right">
+      <!-- Chat Profile 区域 -->
+      <div class="chat-section">
+        <template v-if="lib.profiles.value.length === 0 && lib.editorMode.value === 'idle'">
+          <ProfileEmptyState variant="no-profiles" @add="lib.startNew()" />
+        </template>
+        <template v-else-if="lib.editorMode.value === 'creating' || lib.editorMode.value === 'editing'">
+          <ProfileEditor
+            :draft="lib.draft.value"
+            :providers="lib.providers.value"
+            :isDirty="lib.isDirty.value"
+            :canApply="lib.canApply.value"
+            :isNew="lib.editorMode.value === 'creating'"
+            :refreshing="lib.refreshing.value"
+            :refreshError="lib.refreshError.value"
+            :notice="lib.notice.value"
+            @update="(patch) => { Object.assign(lib.draft.value, patch) }"
+            @updateModel="(i, v) => { Object.assign(lib.draft.value.models[i], v) }"
+            @removeModel="(i) => { lib.draft.value.models.splice(i, 1) }"
+            @refresh="lib.refreshRemoteModels()"
+            @apply="lib.applyDraft()"
+            @delete="lib.requestDelete(lib.draft.value.id)"
+            @dismissError="lib.refreshError.value = null"
+            @dismissNotice="lib.dismissNotice()"
+          />
+        </template>
+        <template v-else>
+          <ProfileEmptyState variant="no-selection" />
+        </template>
+      </div>
+
+      <!-- Embedding 独立配置区域 -->
+      <div class="embedding-section">
+        <EmbeddingConfig />
+      </div>
+    </div>
 
     <!-- Delete confirmation -->
     <DeleteConfirmDialog
@@ -61,6 +68,7 @@ import ProfileList from './ProfileList.vue'
 import ProfileEditor from './ProfileEditor.vue'
 import ProfileEmptyState from './ProfileEmptyState.vue'
 import DeleteConfirmDialog from './DeleteConfirmDialog.vue'
+import EmbeddingConfig from './EmbeddingConfig.vue'
 
 const lib = useModelSettings()
 
@@ -75,5 +83,23 @@ onMounted(() => {
   display: flex;
   height: 100%;
   overflow: hidden;
+}
+
+.ai-model-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  gap: 0;
+}
+
+.chat-section {
+  flex-shrink: 0;
+}
+
+.embedding-section {
+  padding: 20px 28px 28px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
 }
 </style>

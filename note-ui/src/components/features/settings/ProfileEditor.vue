@@ -54,36 +54,6 @@
         </div>
       </div>
 
-      <!-- Embedding -->
-      <div class="pe-section">
-        <label class="pe-label">Embedding 向量化</label>
-        <div v-if="embedModelName" class="pe-embed-info">
-          <div class="pe-embed-row">
-            <span class="pe-embed-label">自动识别模型</span>
-            <span class="pe-embed-value">{{ embedModelName }}</span>
-            <span class="pe-embed-badge ok">已配置</span>
-          </div>
-          <div class="pe-embed-row">
-            <button class="pe-test-btn" :disabled="testingEmbed" @click="$emit('testEmbed')">
-              <span class="material-symbols-outlined" :class="{ spin: testingEmbed }">{{ testingEmbed ? 'sync' : 'network_check' }}</span>
-              {{ testingEmbed ? '测试中...' : '测试 Embedding 连接' }}
-            </button>
-          </div>
-          <div v-if="embedTestResult" class="pe-test-result" :class="embedTestResult.success ? 'ok' : 'fail'">
-            <template v-if="embedTestResult.success">
-              ✅ 连接成功 | 维度: {{ embedTestResult.dimension }} | 延迟: {{ embedTestResult.latencyMs }}ms
-            </template>
-            <template v-else>
-              ❌ {{ embedTestResult.error }}
-            </template>
-          </div>
-        </div>
-        <div v-else class="pe-embed-empty">
-          <span class="material-symbols-outlined">warning</span>
-          该服务商未预置 Embedding 模型，笔记向量化不可用
-        </div>
-      </div>
-
       <!-- Models -->
       <div class="pe-section">
         <div class="pe-models-header">
@@ -140,14 +110,12 @@ const props = defineProps({
   refreshing: { type: Boolean, default: false },
   refreshError: { type: String, default: null },
   notice: { type: String, default: null },
-  testingEmbed: { type: Boolean, default: false },
-  embedTestResult: { type: Object, default: null }
 })
 
 const emit = defineEmits([
   'update', 'updateModel', 'removeModel',
   'refresh', 'apply', 'delete',
-  'dismissError', 'dismissNotice', 'testEmbed'
+  'dismissError', 'dismissNotice'
 ])
 
 const showKey = ref(false)
@@ -155,13 +123,6 @@ const showKey = ref(false)
 const selectedProviderBaseUrl = computed(() => {
   const p = props.providers.find(p => p.key === props.draft.providerKey)
   return p ? p.baseUrl : ''
-})
-
-const embedModelName = computed(() => {
-  const p = props.providers.find(p => p.key === props.draft.providerKey)
-  if (!p || !p.embedModels || p.embedModels.length === 0) return null
-  const def = p.embedModels.find(m => m.isDefault)
-  return def ? def.modelName : p.embedModels[0].modelName
 })
 
 function onProviderChange(key) {
@@ -289,54 +250,6 @@ function onProviderChange(key) {
 .pe-model-row:hover .pe-model-del { opacity: 1; }
 .pe-model-del:hover { background: var(--error-container); color: var(--error-red); }
 .pe-model-del .material-symbols-outlined { font-size: 14px; }
-
-/* Embedding section */
-.pe-embed-info {
-  padding: 12px; border: 1px solid var(--border-default);
-  border-radius: var(--radius-default); background: var(--surface-container-lowest);
-}
-.pe-embed-row {
-  display: flex; align-items: center; gap: 8px;
-}
-.pe-embed-label {
-  font-size: 11px; color: var(--on-surface-variant);
-}
-.pe-embed-value {
-  font-size: var(--text-ui-sm); font-family: monospace;
-  color: var(--on-surface); font-weight: 600;
-}
-.pe-embed-badge {
-  font-size: 10px; padding: 1px 6px; border-radius: 10px;
-  font-weight: 600; margin-left: auto;
-}
-.pe-embed-badge.ok { background: #e8f5e9; color: #2e7d32; }
-.pe-embed-badge.warn { background: #fff3e0; color: #e65100; }
-.pe-embed-empty {
-  display: flex; align-items: center; gap: 6px;
-  padding: 12px; border: 1px dashed var(--error-red);
-  border-radius: var(--radius-default); font-size: 12px;
-  color: var(--error-red);
-}
-.pe-embed-empty .material-symbols-outlined { font-size: 16px; }
-.pe-test-btn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 10px; margin-top: 8px;
-  border: 1px solid var(--border-default); border-radius: var(--radius-default);
-  background: var(--bg); font-family: var(--font-ui); font-size: 11px;
-  color: var(--accent-sage); cursor: pointer;
-}
-.pe-test-btn:hover:not(:disabled) { background: var(--surface-container); }
-.pe-test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.pe-test-btn .material-symbols-outlined { font-size: 14px; }
-.pe-test-result {
-  margin-top: 8px; padding: 6px 10px; border-radius: var(--radius-default);
-  font-size: 11px;
-}
-.pe-test-result.ok { background: #e8f5e9; color: #2e7d32; }
-.pe-test-result.fail { background: #ffebee; color: #c62828; }
-
-/* make models label consistent */
-.pe-models-header .pe-label { margin-bottom: 0; }
 
 /* footer */
 .pe-footer {

@@ -16,11 +16,9 @@ public class UserAIConfigEntity {
 
     private Long userId;
     private String chatProvider;
-    private String chatApiKey;
     private String chatModel;
     private String chatUrl;
     private String embedProvider;
-    private String embedApiKey;
     private String embedModel;
     private String embedUrl;
     private Integer isEnabled;

@@ -7,17 +7,15 @@ import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.EmbeddingFacade;
 import com.note.service.common.exception.BusinessException;
 import com.note.service.common.exception.ErrorCode;
+import com.note.service.common.util.CryptoUtils;
 import com.note.service.entity.AiProviderEntity;
 import com.note.service.entity.UserApiProfileEntity;
 import com.note.service.mapper.UserApiProfileMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
 import java.util.*;
 
 @Slf4j
@@ -26,48 +24,22 @@ public class UserApiProfileService {
 
     private final UserApiProfileMapper mapper;
     private final ObjectMapper objectMapper;
-    private final String aesKey;
+    private final CryptoUtils cryptoUtils;
     private final RestTemplate restTemplate;
     private final AiProviderService aiProviderService;
     private final AIFacadeFactory facadeFactory;
 
     public UserApiProfileService(UserApiProfileMapper mapper,
                                   ObjectMapper objectMapper,
-                                  @Value("${ai.aes-key}") String aesKey,
+                                  CryptoUtils cryptoUtils,
                                   AiProviderService aiProviderService,
                                   AIFacadeFactory facadeFactory) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
-        this.aesKey = aesKey;
+        this.cryptoUtils = cryptoUtils;
         this.restTemplate = new RestTemplate();
         this.aiProviderService = aiProviderService;
         this.facadeFactory = facadeFactory;
-    }
-
-    // ==================== 加密 ====================
-
-    private String encrypt(String plain) {
-        if (plain == null || plain.isEmpty()) return null;
-        try {
-            SecretKeySpec key = new SecretKeySpec(aesKey.getBytes("UTF-8"), "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, key);
-            return Base64.getEncoder().encodeToString(cipher.doFinal(plain.getBytes("UTF-8")));
-        } catch (Exception e) {
-            throw new RuntimeException("API Key 加密失败", e);
-        }
-    }
-
-    private String decrypt(String encrypted) {
-        if (encrypted == null || encrypted.isEmpty()) return null;
-        try {
-            SecretKeySpec key = new SecretKeySpec(aesKey.getBytes("UTF-8"), "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, key);
-            return new String(cipher.doFinal(Base64.getDecoder().decode(encrypted)), "UTF-8");
-        } catch (Exception e) {
-            throw new RuntimeException("API Key 解密失败", e);
-        }
     }
 
     // ==================== CRUD ====================
@@ -106,7 +78,7 @@ public class UserApiProfileService {
             UserApiProfileEntity exist = getById(id, userId);
             if (profileName != null && !profileName.isEmpty()) exist.setProfileName(profileName);
             if (providerKey != null) exist.setProviderKey(providerKey);
-            if (apiKey != null && !apiKey.isEmpty()) exist.setApiKey(encrypt(apiKey));
+            if (apiKey != null && !apiKey.isEmpty()) exist.setApiKey(cryptoUtils.encrypt(apiKey));
             if (baseUrl != null) exist.setBaseUrl(baseUrl);
             if (enabledModels != null) {
                 try { exist.setEnabledModels(objectMapper.writeValueAsString(enabledModels)); }
@@ -121,7 +93,7 @@ public class UserApiProfileService {
             entity.setUserId(userId);
             entity.setProfileName(profileName != null ? profileName : providerKey);
             entity.setProviderKey(providerKey);
-            entity.setApiKey(encrypt(apiKey));
+            if (apiKey != null && !apiKey.isEmpty()) entity.setApiKey(cryptoUtils.encrypt(apiKey));
             entity.setBaseUrl(baseUrl);
             if (enabledModels != null) {
                 try { entity.setEnabledModels(objectMapper.writeValueAsString(enabledModels)); }
@@ -187,7 +159,7 @@ public class UserApiProfileService {
     // ==================== 解密 Key 供内部使用 ====================
 
     public String decryptApiKey(UserApiProfileEntity profile) {
-        return decrypt(profile.getApiKey());
+        return cryptoUtils.decrypt(profile.getApiKey());
     }
 
     /**
@@ -199,7 +171,12 @@ public class UserApiProfileService {
             throw new BusinessException(ErrorCode.PARAM_VALIDATION_FAILED, "请先选择服务商");
         }
         if (apiKey == null || apiKey.isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAM_VALIDATION_FAILED, "请先填写 API Key");
+            // 本地 provider 不需要 API Key
+            if ("local-embedding".equals(providerKey)) {
+                apiKey = "local"; // 占位，Infinity 忽略 Authorization 头
+            } else {
+                throw new BusinessException(ErrorCode.PARAM_VALIDATION_FAILED, "请先填写 API Key");
+            }
         }
         if (baseUrl == null || baseUrl.isEmpty()) {
             AiProviderEntity provider = aiProviderService.getProvider(providerKey);

@@ -1,8 +1,5 @@
-# ========== 安全文档（仅本地保留，不上传公开仓库） ==========
-docs/Note-lite项目安全策略文档.md
-docs/Note-lite项目敏感数据清单.md
-docs/安全策略规范-工程化通用文档.md
-docs/敏感数据清单-工程化通用文档.md
+# ========== 文档（仅本地保留，不上传公开仓库） ==========
+docs/
 
 # ========== IDE ==========
 .idea/
@@ -20,6 +17,10 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# ========== 测试生成的临时数据 ==========
+perf/data/concurrency-users.json
+__pycache__/
 
 # ========== 操作系统 ==========
 .DS_Store

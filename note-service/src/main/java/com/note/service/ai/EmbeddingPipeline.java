@@ -7,13 +7,11 @@ import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.EmbeddingFacade;
 import com.note.service.ai.facade.VectorDoc;
 import com.note.service.ai.facade.VectorStore;
-import com.note.service.common.exception.BusinessException;
-import com.note.service.common.exception.ErrorCode;
+import com.note.service.entity.NoteChunkEntity;
 import com.note.service.entity.NoteEntity;
-import com.note.service.entity.UserApiProfileEntity;
+import com.note.service.mapper.NoteChunkMapper;
 import com.note.service.mapper.NoteMapper;
 import com.note.service.service.AiProviderService;
-import com.note.service.service.UserApiProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,11 +28,11 @@ import java.util.stream.Collectors;
 public class EmbeddingPipeline {
 
     private final NoteMapper noteMapper;
+    private final NoteChunkMapper noteChunkMapper;
     private final MarkdownSplitter splitter;
     private final AIFacadeFactory facadeFactory;
     private final AiProviderService aiProviderService;
     private final AISettingService aiSettingService;
-    private final UserApiProfileService profileService;
     private final Executor embeddingExecutor;
 
     private static final String COLLECTION = "note_chunks";
@@ -69,58 +67,28 @@ public class EmbeddingPipeline {
                 return;
             }
 
-            // Try Profile first, then fall back to legacy user_ai_config
-            EmbedAIConfig config = null;
-
-            // 1) Try Profile-based config
-            List<UserApiProfileEntity> profiles = profileService.listByUser(note.getUserId());
-            UserApiProfileEntity embedProfile = profiles.stream()
-                    .filter(p -> p.getEnabledModels() != null)
-                    .findFirst().orElse(null);
-
-            if (embedProfile != null) {
-                String apiKey = profileService.decryptApiKey(embedProfile);
-                if (apiKey != null && !apiKey.isEmpty()) {
-                    String providerKey = embedProfile.getProviderKey();
-                    var provider = aiProviderService.getProvider(providerKey);
-                    String embedModel = aiProviderService.getDefaultEmbedModel(providerKey);
-                    if (embedModel == null) {
-                        log.info("向量化跳过：厂商 {} 未配置 Embedding 模型", provider.getName());
-                    } else {
-                        config = EmbedAIConfig.builder()
-                                .provider(providerKey)
-                                .apiKey(apiKey)
-                                .model(embedModel)
-                                .baseUrl(embedProfile.getBaseUrl())
-                                .pluginType(provider.getPluginType())
-                                .build();
-                        log.info("向量化使用 Profile: profileId={}, embedModel={}", embedProfile.getId(), embedModel);
-                    }
-                } else {
-                    log.info("向量化跳过：Profile 未配置 API Key userId={}", note.getUserId());
-                }
+            // 用户显式选择 Embedding 服务商，不做降级
+            var embedPref = aiSettingService.getByUserId(note.getUserId());
+            if (embedPref == null || embedPref.getEmbedProvider() == null
+                    || embedPref.getEmbedProvider().isEmpty()) {
+                log.info("向量化跳过：用户未配置 Embedding 服务商 userId={}", note.getUserId());
+                return;
             }
 
-            // 2) Fallback: legacy user_ai_config
-            if (config == null) {
-                var userConfig = aiSettingService.getByUserId(note.getUserId());
-                if (userConfig == null) {
-                    log.info("向量化跳过：用户未配置 AI userId={}", note.getUserId());
-                    return;
-                }
-                try {
-                    config = aiProviderService.buildEmbedConfig(
-                            userConfig.getEmbedProvider(), userConfig.getEmbedModel(),
-                            userConfig.getEmbedUrl());
-                } catch (BusinessException e) {
-                    if (e.getCode().equals(ErrorCode.AI_CONFIG_NOT_FOUND.getCode())
-                            || e.getCode().equals(ErrorCode.AI_CONFIG_DISABLED.getCode())) {
-                        log.info("向量化跳过：用户未配置或已禁用 AI userId={}", note.getUserId());
-                        return;
-                    }
-                    throw e;
-                }
+            EmbedAIConfig config;
+            try {
+                config = aiProviderService.buildEmbedConfig(
+                        embedPref.getEmbedProvider(),
+                        embedPref.getEmbedModel(),
+                        embedPref.getEmbedUrl());
+            } catch (Exception e) {
+                log.warn("向量化跳过：Embedding 配置无效 userId={}, error={}",
+                        note.getUserId(), e.getMessage());
+                return;
             }
+
+            log.debug("向量化使用: provider={}, model={}",
+                    embedPref.getEmbedProvider(), embedPref.getEmbedModel());
 
             EmbeddingFacade embeddingFacade = facadeFactory.getEmbedding(config.getPluginType());
             List<String> texts = chunks.stream().map(Chunk::getText).collect(Collectors.toList());
@@ -141,9 +109,11 @@ public class EmbeddingPipeline {
                 docs.add(doc);
             }
 
-            // 先清除旧向量，再写入新向量（避免 chunk 数量变化时残留旧数据）
             vectorStore.deleteByFilter(COLLECTION, Map.of("noteId", (Object) noteId));
             vectorStore.upsert(COLLECTION, docs);
+
+            // Sync chunks to MySQL for keyword retrieval (best-effort, Qdrant is primary)
+            syncChunksToMySQL(noteId, note.getUserId(), chunks, docs);
             log.info("异步向量化完成: noteId={}, chunks={}", noteId, chunks.size());
 
         } catch (Exception e) {
@@ -154,13 +124,37 @@ public class EmbeddingPipeline {
     private void doDeleteNoteVectors(Long noteId) {
         try {
             VectorStore vectorStore = facadeFactory.getVectorStore();
-            // QdrantVectorStore has a convenience method deleteByNoteId
-            if (vectorStore instanceof com.note.service.ai.facade.impl.QdrantVectorStore qvs) {
-                qvs.deleteByNoteId(COLLECTION, noteId);
-            }
+            vectorStore.deleteByNoteId(COLLECTION, noteId);
+            // Best-effort MySQL cleanup — Qdrant is the source of truth
+            noteChunkMapper.deleteByNoteId(noteId);
             log.info("异步删除向量完成: noteId={}", noteId);
         } catch (Exception e) {
             log.error("异步删除向量异常: noteId={}", noteId, e);
+        }
+    }
+
+    /**
+     * Sync chunk metadata to MySQL for keyword retrieval.
+     * MySQL is a read-only cache — Qdrant is the primary store.
+     * Failure here does NOT roll back Qdrant writes.
+     */
+    private void syncChunksToMySQL(Long noteId, Long userId, List<Chunk> chunks, List<VectorDoc> docs) {
+        try {
+            noteChunkMapper.deleteByNoteId(noteId);
+            List<NoteChunkEntity> entities = new ArrayList<>();
+            for (int i = 0; i < chunks.size(); i++) {
+                NoteChunkEntity entity = new NoteChunkEntity();
+                entity.setNoteId(noteId);
+                entity.setUserId(userId);
+                entity.setChunkIndex(chunks.get(i).getIndex());
+                entity.setChunkText(chunks.get(i).getText());
+                entity.setChunkId(docs.get(i).getId());
+                entities.add(entity);
+            }
+            noteChunkMapper.batchInsert(entities);
+        } catch (Exception e) {
+            log.warn("MySQL chunk sync failed (keyword retrieval will fallback to pure vector): "
+                    + "noteId={}, error={}", noteId, e.getMessage());
         }
     }
 }

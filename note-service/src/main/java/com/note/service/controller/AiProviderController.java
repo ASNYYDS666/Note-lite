@@ -10,7 +10,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,9 +28,10 @@ public class AiProviderController {
     @Operation(summary = "列出所有已启用厂商（含模型）")
     public Result<List<ProviderVO>> listProviders() {
         List<AiProviderEntity> providers = providerService.listEnabledProviders();
+        Map<String, List<AiModelEntity>> modelMap = providerService.listModelsGroupedByProvider();
         List<ProviderVO> vos = providers.stream()
                 .map(p -> {
-                    List<AiModelEntity> models = providerService.listModels(p.getProviderKey(), null);
+                    List<AiModelEntity> models = modelMap.getOrDefault(p.getProviderKey(), List.of());
                     List<ModelVO> chatModels = models.stream()
                             .filter(m -> "CHAT".equals(m.getModelType()))
                             .map(m -> new ModelVO(m.getModelName(), m.getIsDefault() == 1))
@@ -69,15 +69,6 @@ public class AiProviderController {
                         )
                 ));
         return Result.success(grouped);
-    }
-
-    @PutMapping("/providers/{key}/apikey")
-    @Operation(summary = "更新厂商 API Key")
-    public Result<Void> updateApiKey(@AuthenticationPrincipal Long userId,
-                                     @PathVariable String key,
-                                     @RequestBody Map<String, String> body) {
-        providerService.updateApiKey(key, body.get("apiKey"));
-        return Result.success();
     }
 
     // ==================== VO ====================

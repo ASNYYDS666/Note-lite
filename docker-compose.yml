@@ -47,6 +47,28 @@ services:
       - qdrant-data:/qdrant/storage
     restart: unless-stopped
 
+  # ========== 本地 Embedding 向量化 ==========
+  embedding:
+    image: michaelf34/infinity:latest
+    container_name: note-embedding
+    ports:
+      - "8081:7997"
+    command:
+      - --model-id
+      - BAAI/bge-small-zh-v1.5
+      - --port
+      - "7997"
+    volumes:
+      - embedding-cache:/app/.cache
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7997/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # ========== 监控 ==========
   prometheus:
     image: prom/prometheus:latest
@@ -56,6 +78,8 @@ services:
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -65,12 +89,13 @@ services:
     image: grafana/grafana:latest
     container_name: note-grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -81,3 +106,4 @@ volumes:
   qdrant-data:
   prometheus-data:
   grafana-data:
+  embedding-cache:

@@ -96,6 +96,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import { ElMessage } from 'element-plus'
@@ -120,7 +121,7 @@ marked.setOptions({
 
 const renderedHtml = computed(() => {
   if (!note.value.content) return ''
-  return marked.parse(note.value.content)
+  return DOMPurify.sanitize(marked.parse(note.value.content))
 })
 
 const readTime = computed(() => {

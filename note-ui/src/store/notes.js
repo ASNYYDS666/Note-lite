@@ -54,7 +54,7 @@ export const useNotesStore = defineStore('notes', () => {
     try {
       const note = await request.post('/note', { title, content, folderId, tags })
       await loadTree()
-      return note
+      return note.id
     } finally {
       saving.value = false
     }

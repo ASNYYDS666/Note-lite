@@ -43,18 +43,6 @@ public class ChatService {
     }
 
     /**
-     * RAG 对话入口（旧版兼容：使用 user_ai_config 表）。
-     */
-    public Flux<com.note.service.ai.facade.ChatToken> ask(Long userId, String question,
-                            String scopeType, List<Long> scopeIds, String style,
-                            Long conversationId,
-                            AtomicLong conversationIdOut,
-                            String[] questionIdOut) {
-        return ask(userId, question, scopeType, scopeIds, style, conversationId,
-                conversationIdOut, questionIdOut, null, null);
-    }
-
-    /**
      * RAG 对话入口（新版：使用 Profile，支持指定模型）。
      * @param profileId        API Profile ID（非 null 则使用 Profile 制）
      * @param modelName        指定使用的模型名（如 deepseek-chat）
@@ -88,15 +76,12 @@ public class ChatService {
                     .provider(providerKey).apiKey(apiKey).model(actualModel)
                     .baseUrl(baseUrl).pluginType(pluginType).build();
 
-            // Embedding 使用厂商预置的默认 embedding 模型（无需用户手动选择）
-            String embedModel = aiProviderService.getDefaultEmbedModel(providerKey);
-            if (embedModel == null) {
+            // 用户显式配置的 Embedding Provider，未配置则直接拒绝
+            embedConfig = resolveEmbedConfig(userId);
+            if (embedConfig == null) {
                 return Flux.error(new BusinessException(ErrorCode.AI_CONFIG_NOT_FOUND,
-                    "厂商「" + provider.getName() + "」未配置 Embedding 模型，无法进行知识检索"));
+                    "未配置 Embedding 服务商，请在 AI 设置中启用并选择 Embedding 服务"));
             }
-            embedConfig = EmbedAIConfig.builder()
-                    .provider(providerKey).apiKey(apiKey).model(embedModel)
-                    .baseUrl(baseUrl).pluginType(pluginType).build();
         } else {
             // 旧版兼容：从 user_ai_config + ai_provider 构建
             var userConfig = aiSettingService.getByUserId(userId);
@@ -142,5 +127,27 @@ public class ChatService {
         ctx.setConversationHistory(history);
 
         return pipeline.execute(ctx);
+    }
+
+    /**
+     * 解析用户的 Embedding 配置。从 user_ai_config 读取用户显式选择的 Embedding Provider，
+     * 未配置则返回 null，调用方应直接拒绝请求（不再回退到 Chat 厂商）。
+     */
+    private EmbedAIConfig resolveEmbedConfig(Long userId) {
+        var userConfig = aiSettingService.getByUserId(userId);
+        if (userConfig == null || userConfig.getEmbedProvider() == null
+                || userConfig.getEmbedProvider().isEmpty()) {
+            return null;
+        }
+        try {
+            return aiProviderService.buildEmbedConfig(
+                    userConfig.getEmbedProvider(),
+                    userConfig.getEmbedModel(),
+                    userConfig.getEmbedUrl());
+        } catch (Exception e) {
+            log.warn("用户 Embedding 配置无效，回退到默认: userId={}, error={}",
+                    userId, e.getMessage());
+            return null;
+        }
     }
 }

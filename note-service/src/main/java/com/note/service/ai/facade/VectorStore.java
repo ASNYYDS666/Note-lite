@@ -15,6 +15,9 @@ public interface VectorStore {
     /** 按过滤条件删除 */
     void deleteByFilter(String collection, Map<String, Object> filter);
 
+    /** 按笔记 ID 删除向量 */
+    void deleteByNoteId(String collection, Long noteId);
+
     /** 创建 Collection */
     void createCollection(String collection, int vectorSize);
 

@@ -1,5 +1,7 @@
 package com.note.service.controller;
 
+import com.note.service.common.exception.BusinessException;
+import com.note.service.common.exception.ErrorCode;
 import com.note.service.common.util.JwtUtils;
 import com.note.service.common.vo.LoginVO;
 import com.note.service.common.vo.Result;
@@ -56,6 +58,9 @@ public class UserController {
     @Operation(summary = "获取当前用户信息")
     public Result<UserInfoVO> getUserInfo(@AuthenticationPrincipal Long userId) {
         UserEntity user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
         UserInfoVO vo = new UserInfoVO();
         vo.setId(user.getId());
         vo.setUsername(user.getUsername());

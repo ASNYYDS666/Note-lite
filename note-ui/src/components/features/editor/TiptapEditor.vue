@@ -423,11 +423,4 @@ onBeforeUnmount(() => {
 .editor-content :deep(.tiptap p) {
   margin: 8px 0;
 }
-
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--secondary-fixed);
-  border-radius: 10px;
-}
 </style>

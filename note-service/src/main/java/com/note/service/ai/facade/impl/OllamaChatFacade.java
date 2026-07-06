@@ -53,8 +53,9 @@ public class OllamaChatFacade implements LLMFacade {
                             return ChatToken.DONE;
                         }
                         if (node.has("error")) {
-                            log.error("Ollama Chat API 返回错误: {}", line);
-                            return ChatToken.answer("");
+                            String msg = node.get("error").asText();
+                            log.error("Ollama Chat API 返回错误: {}", msg);
+                            throw new BusinessException(ErrorCode.AI_CHAT_FAILED, "Ollama: " + msg);
                         }
                         JsonNode message = node.path("message");
                         JsonNode content = message.path("content");

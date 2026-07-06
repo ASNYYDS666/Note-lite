@@ -154,8 +154,14 @@ public class NoteService extends ServiceImpl<NoteMapper, NoteEntity> {
 
     @Transactional
     public void updateNote(Long noteId, Long userId, NoteDTO dto) {
-        // 1. 校验权限
-        NoteEntity exist = getDetail(noteId, userId);  // 会抛异常如果无权限
+        // 1. 校验权限（轻量：只查主表，避免 getDetail 的缓存读写+标签查询被 178 行 clearNoteCache 浪费）
+        NoteEntity exist = baseMapper.selectById(noteId);
+        if (exist == null || !exist.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOTE_NO_PERMISSION);
+        }
+        if (exist.getIsDeleted() == 1) {
+            throw new BusinessException(ErrorCode.NOTE_IN_RECYCLE);
+        }
 
         // 2. 更新主表（仅更新非 null 字段，支持部分更新如内联重命名）
         exist.setTitle(dto.getTitle().trim());

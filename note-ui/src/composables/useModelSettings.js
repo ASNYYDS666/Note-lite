@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { getProfiles, saveProfile, deleteProfile, refreshModels, testProfileEmbed } from '@/api/aiConfig'
+import { getProfiles, saveProfile, deleteProfile, refreshModels } from '@/api/aiConfig'
 import request from '@/utils/request'
 
 export function useModelSettings() {
@@ -13,10 +13,6 @@ export function useModelSettings() {
   const notice = ref(null)
   const pendingDeleteId = ref(null)
   const editorMode = ref('idle') // 'idle' | 'creating' | 'editing'
-
-  // Embedding test state
-  const testingEmbed = ref(false)
-  const embedTestResult = ref(null) // { success, embedModel, dimension, latencyMs, error }
 
   // ---- derived ----
   const selectedProfile = computed(() =>
@@ -106,42 +102,6 @@ export function useModelSettings() {
     } catch { /* ignore */ }
   }
 
-  function selectedProviderEmbedModel() {
-    const p = providers.value.find(p => p.key === draft.value.providerKey)
-    if (!p || !p.embedModels || p.embedModels.length === 0) return null
-    const def = p.embedModels.find(m => m.isDefault)
-    return def ? def.modelName : p.embedModels[0].modelName
-  }
-
-  async function testEmbed() {
-    const providerKey = draft.value.providerKey
-    const apiKey = draft.value.apiKey
-    let baseUrl = draft.value.baseUrl
-    if (!baseUrl) {
-      const p = providers.value.find(p => p.key === providerKey)
-      baseUrl = p ? p.baseUrl : ''
-    }
-    if (!providerKey) {
-      embedTestResult.value = { success: false, error: '请先选择服务商' }
-      return
-    }
-    if (!apiKey && !draft.value.id) {
-      embedTestResult.value = { success: false, error: '请先填写 API Key' }
-      return
-    }
-
-    testingEmbed.value = true
-    embedTestResult.value = null
-    try {
-      const res = await testProfileEmbed(providerKey, apiKey, baseUrl)
-      embedTestResult.value = { success: true, ...res }
-    } catch (e) {
-      embedTestResult.value = { success: false, error: e.message || '连接失败' }
-    } finally {
-      testingEmbed.value = false
-    }
-  }
-
   async function loadProfiles() {
     try {
       const data = await getProfiles()
@@ -175,7 +135,6 @@ export function useModelSettings() {
     remoteModels.value = []
     refreshError.value = null
     notice.value = null
-    embedTestResult.value = null
     editorMode.value = 'creating'
   }
 
@@ -184,7 +143,6 @@ export function useModelSettings() {
     remoteModels.value = []
     refreshError.value = null
     notice.value = null
-    embedTestResult.value = null
     editorMode.value = 'editing'
   }
 
@@ -281,13 +239,11 @@ export function useModelSettings() {
     // state
     providers, profiles, draft, remoteModels, refreshing, refreshError, notice,
     pendingDeleteId, editorMode,
-    testingEmbed, embedTestResult,
     // derived
     selectedProfile, isDirty, canApply, pendingDeleteProfile,
     // actions
     loadProviders, loadProfiles, startNew, selectProfile, applyDraft,
     requestDelete, cancelDelete, confirmDelete,
-    refreshRemoteModels, dismissNotice, discardDraft,
-    selectedProviderEmbedModel, testEmbed
+    refreshRemoteModels, dismissNotice, discardDraft
   }
 }

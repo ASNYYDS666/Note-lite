@@ -26,7 +26,7 @@ public class OpenAICompatibleChatFacade implements LLMFacade {
 
     @Override
     public Flux<ChatToken> streamChat(List<Map<String, String>> messages, ChatAIConfig config) {
-        String baseUrl = config.getBaseUrl();
+        String baseUrl = ensureProtocol(config.getBaseUrl());
         String model = config.getModel();
         WebClient client = webClientBuilder.baseUrl(baseUrl).build();
         log.info("Chat 请求: url={}/chat/completions, model={}", baseUrl, model);
@@ -146,5 +146,11 @@ public class OpenAICompatibleChatFacade implements LLMFacade {
     @Override
     public boolean supports(String provider) {
         return true;
+    }
+
+    private static String ensureProtocol(String url) {
+        if (url == null || url.isEmpty()) return url;
+        if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        return "https://" + url;
     }
 }

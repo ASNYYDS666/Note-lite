@@ -485,15 +485,4 @@ onUnmounted(() => {
   background: var(--border-subtle);
   margin: 4px 8px;
 }
-
-/* ===== Scrollbar ===== */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--outline);
-}
 </style>

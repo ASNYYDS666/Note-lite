@@ -35,6 +35,7 @@ public class ConversationController {
     @Operation(summary = "获取用户对话列表")
     public Result<List<ConversationVO>> listConversations(@AuthenticationPrincipal Long userId) {
         List<ConversationEntity> list = conversationService.listUserConversations(userId);
+        Map<Long, Long> countMap = conversationService.countMessagesForUser(userId);
         List<ConversationVO> vos = list.stream()
                 .map(c -> {
                     ConversationVO vo = new ConversationVO();
@@ -42,7 +43,7 @@ public class ConversationController {
                     vo.setTitle(c.getTitle());
                     vo.setCreatedAt(c.getCreatedAt());
                     vo.setUpdatedAt(c.getUpdatedAt());
-                    vo.setMessageCount((int) conversationService.countMessages(c.getId()));
+                    vo.setMessageCount(countMap.getOrDefault(c.getId(), 0L).intValue());
                     return vo;
                 })
                 .collect(Collectors.toList());

@@ -2,6 +2,7 @@ package com.note.service.ai.controller;
 
 import com.note.service.ai.ChatService;
 import com.note.service.ai.facade.ChatToken;
+import com.note.service.common.metrics.SSEConnectionMetrics;
 import com.note.service.dto.ChatRequest;
 import com.note.service.service.ConversationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -28,6 +30,8 @@ public class ChatController {
 
     private final ChatService chatService;
     private final ConversationService conversationService;
+    private final Executor chatExecutor;
+    private final SSEConnectionMetrics sseMetrics;
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "AI 对话（SSE 流式）")
@@ -37,8 +41,13 @@ public class ChatController {
         SseEmitter emitter = new SseEmitter(120_000L);
 
         SecurityContext securityContext = SecurityContextHolder.getContext();
+        sseMetrics.onConnectionOpen();
 
-        new Thread(() -> {
+        emitter.onCompletion(sseMetrics::onConnectionClose);
+        emitter.onError(e -> sseMetrics.onConnectionError());
+        emitter.onTimeout(sseMetrics::onConnectionClose);
+
+        chatExecutor.execute(() -> {
             SecurityContextHolder.setContext(securityContext);
             try {
                 AtomicLong cidHolder = new AtomicLong();
@@ -95,7 +104,7 @@ public class ChatController {
             } finally {
                 SecurityContextHolder.clearContext();
             }
-        }, "sse-chat").start();
+        });
 
         return emitter;
     }

@@ -34,7 +34,7 @@ class RAGPipelineTest {
 
     @BeforeEach
     void setUp() {
-        mockStage1 = spy(new QueryRewriteStage());
+        mockStage1 = mock(QueryRewriteStage.class);
         mockStage2 = mock(RAGStage.class);
         mockStage3 = mock(RAGStage.class);
 

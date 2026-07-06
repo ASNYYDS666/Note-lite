@@ -102,6 +102,31 @@
         </button>
       </template>
     </div>
+
+    <!-- Move note dialog -->
+    <el-dialog v-model="moveDialogVisible" title="移动到..." width="360px">
+      <div class="move-folder-list">
+        <div
+          class="move-folder-item"
+          :class="{ 'is-selected': false }"
+          @click="doMoveNote(null)"
+        >
+          <span class="material-symbols-outlined">folder_open</span>
+          <span>根目录</span>
+        </div>
+        <div
+          v-for="f in folderOptions"
+          :key="f.id"
+          class="move-folder-item"
+          :style="{ paddingLeft: (12 + f.depth * 20) + 'px' }"
+          @click="doMoveNote(f.id)"
+        >
+          <span class="material-symbols-outlined">folder</span>
+          <span>{{ f.name }}</span>
+        </div>
+      </div>
+      <div v-if="folderOptions.length === 0" class="move-empty">暂无文件夹</div>
+    </el-dialog>
   </div>
 </template>
 
@@ -309,10 +334,38 @@ async function handleDeleteFolder() {
   } catch { /* cancelled */ }
 }
 
-async function handleMoveNote() {
+const moveDialogVisible = ref(false)
+const movingNote = ref(null)
+
+const folderOptions = computed(() => {
+  const raw = notes.noteTree
+  if (!raw || !raw.folders) return []
+  const result = []
+  function walk(folders, depth) {
+    for (const f of folders) {
+      result.push({ id: f.id, name: f.name, depth })
+      if (f.children) walk(f.children, depth + 1)
+    }
+  }
+  walk(raw.folders, 0)
+  return result
+})
+
+function handleMoveNote() {
   const node = contextMenu.value.node
   contextMenu.value.visible = false
-  ElMessage.info('移动功能开发中')
+  movingNote.value = node.raw
+  moveDialogVisible.value = true
+}
+
+async function doMoveNote(targetFolderId) {
+  try {
+    await notes.moveNote(movingNote.value.id, targetFolderId)
+    ElMessage.success(`已移动到 ${targetFolderId ? '指定文件夹' : '根目录'}`)
+    moveDialogVisible.value = false
+  } catch {
+    ElMessage.error('移动失败')
+  }
 }
 
 async function handleShareNote() {
@@ -484,10 +537,39 @@ async function handleSoftDelete() {
   margin: 4px;
 }
 
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--secondary-fixed);
-  border-radius: 10px;
+/* ---- Move dialog ---- */
+.move-folder-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.move-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-default);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--font-ui);
+  font-size: var(--text-ui-sm);
+  color: var(--on-surface);
+}
+
+.move-folder-item:hover {
+  background: var(--surface-container);
+}
+
+.move-folder-item .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--secondary);
+}
+
+.move-empty {
+  text-align: center;
+  color: var(--outline);
+  font-family: var(--font-ui);
+  font-size: var(--text-ui-sm);
+  padding: 20px;
 }
 </style>

@@ -28,6 +28,9 @@ public final class CacheConstants {
     /** 分享码空值缓存（防穿透），格式：share:code:null:{code} */
     public static final String SHARE_CODE_NULL_PREFIX = "share:code:null:";
 
+    /** 笔记树缓存，格式：note:tree:{userId} */
+    public static final String NOTE_TREE_PREFIX = "note:tree:";
+
     // ========== TTL（单位：秒） ==========
 
     /** 笔记详情 TTL：6 小时 */
@@ -44,6 +47,9 @@ public final class CacheConstants {
 
     /** 分享码 TTL：7 天（与数据库 expire_at 对齐） */
     public static final long SHARE_CODE_TTL_SECONDS = 7 * 86400;
+
+    /** 笔记树 TTL：10 秒 */
+    public static final long NOTE_TREE_TTL_SECONDS = 10;
 
     // ========== 工具方法 ==========
 

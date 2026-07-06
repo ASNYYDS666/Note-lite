@@ -10,6 +10,7 @@ import com.note.service.mapper.UserAIConfigMapper;
 import com.note.service.service.AiProviderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -36,6 +37,46 @@ public class AISettingService {
         return toVO(config);
     }
 
+    /**
+     * 获取用户的 Embedding 配置（仅 embedding 相关字段）。
+     * 如果用户没有 user_ai_config 行，返回 null。
+     */
+    public UserAIConfigVO getEmbeddingConfig(Long userId) {
+        return getByUserId(userId);
+    }
+
+    /**
+     * 保存用户的 Embedding 配置。
+     * 已有行则更新 embedding 字段，无行则创建（chat 字段走 DB 默认值）。
+     */
+    @Transactional
+    public void saveEmbeddingConfig(Long userId, String embedProvider,
+                                     String embedModel, String embedUrl) {
+        UserAIConfigEntity exist = mapper.selectOne(
+                new LambdaQueryWrapper<UserAIConfigEntity>()
+                        .eq(UserAIConfigEntity::getUserId, userId));
+
+        if (exist != null) {
+            exist.setEmbedProvider(embedProvider);
+            exist.setEmbedModel(embedModel);
+            if (embedUrl != null) exist.setEmbedUrl(embedUrl);
+            mapper.updateById(exist);
+        } else {
+            UserAIConfigEntity config = new UserAIConfigEntity();
+            config.setUserId(userId);
+            config.setEmbedProvider(embedProvider);
+            config.setEmbedModel(embedModel);
+            config.setEmbedUrl(embedUrl);
+            config.setChatProvider("");
+            config.setChatModel("");
+            config.setChatUrl("");
+            config.setIsEnabled(1);
+            mapper.insert(config);
+        }
+        log.info("Embedding 配置已保存: userId={}, provider={}, model={}",
+                userId, embedProvider, embedModel);
+    }
+
     private UserAIConfigEntity getEntity(Long userId) {
         UserAIConfigEntity config = mapper.selectOne(
                 new LambdaQueryWrapper<UserAIConfigEntity>()
@@ -56,6 +97,7 @@ public class AISettingService {
      * chatApiKey/embedApiKey 写入 ai_provider 表；
      * provider key + model 引用写入 user_ai_config 表。
      */
+    @Transactional
     public void saveOrUpdate(Long userId, AISettingSaveDTO dto) {
         // 将 API Key 写入 ai_provider 表
         if (dto.getChatProvider() != null && dto.getChatApiKey() != null) {

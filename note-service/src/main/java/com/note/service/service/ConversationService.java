@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -68,10 +70,9 @@ public class ConversationService {
         return conv;
     }
 
+    @Transactional
     public void deleteConversation(Long id, Long userId) {
         getConversation(id, userId);
-        messageMapper.delete(new LambdaQueryWrapper<MessageEntity>()
-                .eq(MessageEntity::getConversationId, id));
         conversationMapper.deleteById(id);
         log.info("对话已删除: id={}, userId={}", id, userId);
     }
@@ -177,6 +178,18 @@ public class ConversationService {
     }
 
     // ==================== 工具 ====================
+
+    /**
+     * 批量查询用户所有会话的消息数量，替代 N+1 的逐条 COUNT。
+     */
+    public Map<Long, Long> countMessagesForUser(Long userId) {
+        List<Map<String, Object>> rows = messageMapper.countMessagesGroupByConversation(userId);
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row.get("conversation_id"),
+                        row -> ((Number) row.get("cnt")).longValue()
+                ));
+    }
 
     public long countMessages(Long conversationId) {
         Long count = messageMapper.selectCount(

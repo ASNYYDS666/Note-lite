@@ -4,6 +4,7 @@ import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.VectorDoc;
 import com.note.service.ai.facade.VectorStore;
 import com.note.service.ai.pipeline.RAGContext;
+import com.note.service.ai.retrieval.KeywordRetriever;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,7 +28,10 @@ class RetrievalStageTest {
     private static final int TOP_K = 5;
     private static final double SCORE_THRESHOLD = 0.3;
 
+    private static final int FETCH_K = 10; // max(TOP_K * 2, 10)
+
     private VectorStore vectorStore;
+    private KeywordRetriever keywordRetriever;
     private RetrievalStage stage;
     private RAGContext ctx;
 
@@ -37,10 +41,14 @@ class RetrievalStageTest {
         AIFacadeFactory factory = mock(AIFacadeFactory.class);
         when(factory.getVectorStore()).thenReturn(vectorStore);
 
-        stage = new RetrievalStage(factory, COLLECTION, TOP_K, SCORE_THRESHOLD);
+        keywordRetriever = mock(KeywordRetriever.class);
+        when(keywordRetriever.search(anyString(), anyLong(), anyInt())).thenReturn(Map.of());
+
+        stage = new RetrievalStage(factory, keywordRetriever, COLLECTION, TOP_K, SCORE_THRESHOLD);
 
         ctx = new RAGContext();
         ctx.setUserId(1L);
+        ctx.setQuestion("test question");
         ctx.setQueryVector(List.of(0.1f, 0.2f));
     }
 
@@ -52,7 +60,7 @@ class RetrievalStageTest {
 
         stage.process(ctx);
 
-        verify(vectorStore).search(eq(COLLECTION), any(), any(), eq(TOP_K));
+        verify(vectorStore).search(eq(COLLECTION), any(), any(), eq(FETCH_K));
     }
 
     @Nested
@@ -106,9 +114,11 @@ class RetrievalStageTest {
         @DisplayName("score 低于阈值的文档被过滤")
         void testLowScoreDocsFilteredOut() {
             VectorDoc highScore = new VectorDoc();
+            highScore.setId("high");
             highScore.setScore(0.8);
             highScore.setPayload(Map.of("title", "相关笔记"));
             VectorDoc lowScore = new VectorDoc();
+            lowScore.setId("low");
             lowScore.setScore(0.1);
             lowScore.setPayload(Map.of("title", "无关笔记"));
 
@@ -119,15 +129,19 @@ class RetrievalStageTest {
 
             assertThat(ctx.getRetrieved()).hasSize(2);
             assertThat(ctx.getFilteredDocs()).hasSize(1);
-            assertThat(ctx.getFilteredDocs().get(0).getScore()).isEqualTo(0.8);
+            // Score is blended by RRF: 0.6*vector + 0.4*kw, kw=0 → 0.48
+            assertThat(ctx.getFilteredDocs().get(0).getScore()).isEqualTo(0.48);
+            assertThat(ctx.getFilteredDocs().get(0).getId()).isEqualTo("high");
         }
 
         @Test
         @DisplayName("score 为 null 的文档被过滤")
         void testNullScoreDocsFilteredOut() {
             VectorDoc withScore = new VectorDoc();
+            withScore.setId("a");
             withScore.setScore(0.5);
             VectorDoc nullScore = new VectorDoc();
+            nullScore.setId("b");
             nullScore.setScore(null);
 
             when(vectorStore.search(anyString(), any(), any(), anyInt()))

@@ -237,7 +237,7 @@ function markDirty() {
   margin-bottom: 18px;
 }
 .ep-header-left { display: flex; align-items: flex-start; gap: 10px; }
-.ep-icon { font-size: 22px; color: var(--accent-primary); margin-top: 2px; }
+.ep-icon { font-size: 22px; color: var(--el-color-primary); margin-top: 2px; }
 .ep-title { font-size: 15px; font-weight: 600; color: var(--on-surface); margin: 0 0 2px; }
 .ep-desc { font-size: 12px; color: var(--on-surface-variant); margin: 0; }
 
@@ -269,7 +269,7 @@ function markDirty() {
   background: #bdbdbd; position: relative; transition: background 0.2s;
   flex-shrink: 0;
 }
-.ep-switch-track.on { background: var(--accent-primary); }
+.ep-switch-track.on { background: var(--el-color-primary); }
 .ep-switch-thumb {
   width: 20px; height: 20px; border-radius: 50%; background: #fff;
   position: absolute; top: 2px; left: 2px;
@@ -282,7 +282,7 @@ function markDirty() {
   padding: 6px 16px; border: none; border-radius: 6px;
   font-family: var(--font-ui); font-size: 12px; font-weight: 600;
   cursor: pointer; white-space: nowrap;
-  background: var(--accent-primary); color: #fff;
+  background: var(--el-color-primary); color: #fff;
   animation: pulse 0.6s ease-in-out;
 }
 @keyframes pulse {
@@ -307,7 +307,7 @@ function markDirty() {
   font-family: var(--font-ui); font-size: var(--text-ui-sm);
   outline: none; box-sizing: border-box; cursor: pointer;
 }
-.ep-select:focus { border-color: var(--accent-primary); }
+.ep-select:focus { border-color: var(--el-color-primary); }
 
 .ep-model-card {
   display: flex; align-items: center; gap: 8px;
@@ -330,7 +330,7 @@ function markDirty() {
   padding: 6px 14px; border: 1px solid var(--border-default);
   border-radius: 8px; background: var(--bg);
   font-family: var(--font-ui); font-size: var(--text-ui-sm);
-  color: var(--accent-primary); cursor: pointer;
+  color: var(--el-color-primary); cursor: pointer;
 }
 .ep-test-btn:hover:not(:disabled) { background: var(--surface-container); }
 .ep-test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -344,7 +344,7 @@ function markDirty() {
 
 .ep-save-btn {
   margin-top: 12px; padding: 8px 24px; border: none; border-radius: 8px;
-  background: var(--accent-primary); color: white;
+  background: var(--el-color-primary); color: white;
   font-family: var(--font-ui); font-size: var(--text-ui-sm); font-weight: 600;
   cursor: pointer; animation: pulse 0.6s ease-in-out;
 }
@@ -368,5 +368,5 @@ function markDirty() {
   border: 1px dashed var(--border-default);
   font-size: 13px; color: var(--on-surface-variant);
 }
-.ep-disabled-hint .material-symbols-outlined { font-size: 18px; color: var(--accent-primary); }
+.ep-disabled-hint .material-symbols-outlined { font-size: 18px; color: var(--el-color-primary); }
 </style>

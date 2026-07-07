@@ -60,7 +60,7 @@ services:
       - SPRING_DATA_REDIS_PASSWORD=
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-this-secret-must-be-at-least-256-bits-long}
       - AI_AES_KEY=${AI_AES_KEY:-change-me-in-production}
     depends_on:
       mysql:

@@ -2,19 +2,18 @@ package com.note.service.common.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
 /**
- * 跨域配置
- * 允许前端 localhost:5173 / localhost:3000 访问后端 API
+ * 跨域配置（仅开发环境生效）
+ * 允许前端 Vite dev server (5173) 访问后端 API (8080)
  *
- * 为什么需要这个配置？
- * 1. 浏览器同源策略禁止不同端口的请求
- * 2. 前后端分离项目必然跨域（前端5173，后端8080）
- * 3. 必须正确处理 OPTIONS 预检请求
+ * 生产环境不需要：nginx 将前后端统一代理到同一端口，浏览器视为同源请求。
  */
+@Profile("dev")
 @Configuration
 public class CorsConfig {
 

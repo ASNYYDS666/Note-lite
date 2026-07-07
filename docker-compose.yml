@@ -69,6 +69,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+    dns:
+      - 127.0.0.11
     restart: unless-stopped
 
   # ========== 前端服务 ==========

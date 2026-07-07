@@ -71,6 +71,8 @@ services:
         condition: service_started
     dns:
       - 127.0.0.11
+      - 8.8.8.8
+      - 114.114.114.114
     restart: unless-stopped
 
   # ========== 前端服务 ==========

@@ -1,10 +1,15 @@
 FROM python:3.11-slim
 WORKDIR /app
 
-# 先装 CPU 版 PyTorch（~200MB），避免拉无用的 CUDA 库（~3GB）
+# 1. 从清华镜像安装 torch 的全部依赖（不装 torch 本身）
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
-      torch --extra-index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+      filelock typing-extensions sympy networkx jinja2 fsspec mpmath markupsafe numpy
+
+# 2. 仅从 pytorch.org 下载 CPU 版 torch 本体（~192MB，不拉依赖）
+RUN pip install --no-cache-dir --no-deps --index-url https://download.pytorch.org/whl/cpu torch
+
+# 3. 从清华镜像安装其余包（sentence-transformers 检测到 torch 已装，不会重复拉）
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
       fastapi uvicorn sentence-transformers
 
 COPY embedding_server.py .

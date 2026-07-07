@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 WORKDIR /app
-RUN pip install --no-cache-dir fastapi uvicorn sentence-transformers
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn sentence-transformers
 COPY embedding_server.py .
 EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \

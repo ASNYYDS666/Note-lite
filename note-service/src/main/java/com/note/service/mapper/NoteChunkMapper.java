@@ -28,12 +28,13 @@ public interface NoteChunkMapper extends BaseMapper<NoteChunkEntity> {
     @Select("SELECT COUNT(*) FROM note_chunks WHERE user_id = #{userId}")
     int countByUserId(@Param("userId") Long userId);
 
-    /** Batch insert chunk records */
+    /** Batch insert chunk records. ON DUPLICATE KEY UPDATE makes it safe for concurrent updates to the same note. */
     @org.apache.ibatis.annotations.Insert("<script>"
             + "INSERT INTO note_chunks (note_id, user_id, chunk_index, chunk_text, chunk_id) VALUES "
             + "<foreach collection='chunks' item='c' separator=','>"
             + "(#{c.noteId}, #{c.userId}, #{c.chunkIndex}, #{c.chunkText}, #{c.chunkId})"
             + "</foreach>"
+            + " ON DUPLICATE KEY UPDATE chunk_text = VALUES(chunk_text), chunk_index = VALUES(chunk_index)"
             + "</script>")
     int batchInsert(@Param("chunks") List<NoteChunkEntity> chunks);
 

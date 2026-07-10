@@ -63,36 +63,47 @@ docker compose --profile monitoring up -d
 | `HF_ENDPOINT` | HuggingFace 模型下载镜像（仅 `--profile embedding`） | `https://hf-mirror.com` |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码（仅 `--profile monitoring`） | `admin` |
 
-> **生产环境**：建议创建 `.env` 文件，用 `openssl rand -hex 32` 生成随机值填入。切勿使用默认值。
+> **生产环境**：必须创建 `.env` 文件设置真实密钥。切勿使用默认值部署到公网。
 
 ### 部署到云服务器
 
 ```bash
 git clone https://github.com/ASNYYDS666/Note-lite.git && cd Note-lite
 
-# 创建 .env 文件，填入随机密钥
-cat > .env << 'EOF'
+# 1. 生成随机密钥并写入 .env
 JWT_SECRET=$(openssl rand -hex 32)
 AI_AES_KEY=$(openssl rand -hex 16)
+
+cat > .env << EOF
+JWT_SECRET=${JWT_SECRET}
+AI_AES_KEY=${AI_AES_KEY}
 MYSQL_ROOT_PASSWORD=$(openssl rand -hex 8)
 EOF
 
-# 启动（含本地 Embedding）
+# 2. 启动服务（--profile embedding 启用本地 Embedding，可选）
 docker compose --profile embedding up -d --build
 
-# 等待启动完成（约 60 秒）
+# 3. 等待启动完成（约 60 秒）
 docker logs -f note-backend
 # 看到 "Started NoteServiceApplication" 即就绪
-
-# 创建 Qdrant 集合
-curl -X PUT http://localhost:16333/collections/note_chunks \
-  -H 'Content-Type: application/json' \
-  -d '{"vectors":{"size":512,"distance":"Cosine"}}'
 ```
 
-浏览器访问 `http://<服务器IP>:3100`，注册账号后即可使用。
+浏览器访问 `http://<服务器IP>:3100`，注册账号后即可使用。Qdrant 集合会在首次启动时自动初始化，无需手动创建。
 
-> **安全提醒**：在云服务商控制台修改安全组，仅放行 3100 端口。MySQL（3306）、Redis（6379）、Qdrant（16333）等端口不应对外暴露。
+#### 安全加固清单
+
+部署到公网后，按顺序完成以下操作：
+
+1. **云服务商控制台 → 安全组**：仅放行 `3100` 端口（及 SSH `22`），关闭 MySQL（3306）、Redis（6379）、Qdrant（16333）、Backend（8080）等内部端口
+2. **检查 .env 已生成**：`cat /root/Note-lite/.env`，确认 `JWT_SECRET` 和 `AI_AES_KEY` 是随机值而非默认值
+3. **备份 .env**：将 `.env` 文件内容保存到本地密码管理器，服务器重装后可恢复
+4. **Grafana 改密码**（如启用了 `--profile monitoring`）：在 `.env` 中设置 `GRAFANA_ADMIN_PASSWORD`
+
+日常更新命令（`.env` 不会被覆盖）：
+
+```bash
+cd /root/Note-lite && git pull && docker compose up -d --build
+```
 
 ### 用户使用流程
 

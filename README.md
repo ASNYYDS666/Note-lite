@@ -19,16 +19,14 @@
 适合不想下载大体积模型镜像的用户。启动后，在 AI 设置页面填入任意支持 Embedding 的 API Key 即可。
 
 ```bash
-git clone https://github.com/your-org/Note-lite.git
+git clone https://github.com/ASNYYDS666/Note-lite.git
 cd Note-lite
 
-# 启动全部服务（不含本地 Embedding，约 1GB 拉取）
+# 仅启动核心服务（不含本地 Embedding、不含监控）
 docker compose up -d
 ```
 
-浏览器打开 `http://localhost:3100`，进入 **设置 → AI 模型 → Embedding 配置**，选择一个厂商并填入 API Key。
-
-> 内置 Embedding 厂商：OpenAI / 阿里云百炼 / 硅基流动 / 腾讯混元 / 火山引擎 / Infini / 百川。
+访问 `http://localhost:3100`，注册账号后进入 **设置 → AI 模型**，配置 API Profile。
 
 ### 方式二：全量启动（含本地 Embedding）
 
@@ -60,12 +58,51 @@ docker compose --profile monitoring up -d
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | `1234` |
-| `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
-| `AI_AES_KEY` | AI API Key AES 加密密钥 | `change-me-in-production` |
+| `JWT_SECRET` | JWT 签名密钥（**生产必须改，≥ 32 字符**） | `change-me-in-production-...` |
+| `AI_AES_KEY` | AI API Key AES 加密密钥（**生产必须改，16 字节**） | `change-me-in-production` |
 | `HF_ENDPOINT` | HuggingFace 模型下载镜像（仅 `--profile embedding`） | `https://hf-mirror.com` |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码（仅 `--profile monitoring`） | `admin` |
 
-> 生产环境务必修改 `JWT_SECRET` 和 `AI_AES_KEY`，建议用 `openssl rand -hex 32` 生成随机值，写入 `.env` 文件。
+> **生产环境**：建议创建 `.env` 文件，用 `openssl rand -hex 32` 生成随机值填入。切勿使用默认值。
+
+### 部署到云服务器
+
+```bash
+git clone https://github.com/ASNYYDS666/Note-lite.git && cd Note-lite
+
+# 创建 .env 文件，填入随机密钥
+cat > .env << 'EOF'
+JWT_SECRET=$(openssl rand -hex 32)
+AI_AES_KEY=$(openssl rand -hex 16)
+MYSQL_ROOT_PASSWORD=$(openssl rand -hex 8)
+EOF
+
+# 启动（含本地 Embedding）
+docker compose --profile embedding up -d --build
+
+# 等待启动完成（约 60 秒）
+docker logs -f note-backend
+# 看到 "Started NoteServiceApplication" 即就绪
+
+# 创建 Qdrant 集合
+curl -X PUT http://localhost:16333/collections/note_chunks \
+  -H 'Content-Type: application/json' \
+  -d '{"vectors":{"size":512,"distance":"Cosine"}}'
+```
+
+浏览器访问 `http://<服务器IP>:3100`，注册账号后即可使用。
+
+> **安全提醒**：在云服务商控制台修改安全组，仅放行 3100 端口。MySQL（3306）、Redis（6379）、Qdrant（16333）等端口不应对外暴露。
+
+### 用户使用流程
+
+1. 打开 `http://<服务器IP>:3100`，注册账号（邮箱可选）
+2. 进入 **设置 → AI 模型**，配置 API Profile：
+   - 选择 DeepSeek 等厂商，填入 API Key，点击刷新模型列表
+   - 选择 Chat 模型和 Embedding 模型
+3. 进入 **设置 → Embedding 配置**，启用本地 Embedding 或选择远程厂商
+4. 创建笔记 → 笔记自动向量化存入 Qdrant
+5. 打开右侧 AI 面板 → 提问时自动检索相关笔记内容注入对话
 
 ## 技术栈
 

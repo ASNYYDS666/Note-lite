@@ -3,7 +3,6 @@ package com.note.service.ai.pipeline.stages;
 import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.LLMFacade;
-import com.note.service.ai.metrics.MonitorStage;
 import com.note.service.ai.pipeline.RAGContext;
 import com.note.service.ai.pipeline.RAGStage;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ public class GenerationStage implements RAGStage {
     private final AIFacadeFactory factory;
 
     @Override
-    @MonitorStage("generation")
     public void process(RAGContext ctx) {
         LLMFacade llm = factory.getLLM(ctx.getChatConfig().getPluginType());
         ctx.setResponseStream(

@@ -3,6 +3,7 @@ package com.note.service.ai.pipeline.stages;
 import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.LLMFacade;
+import com.note.service.ai.metrics.MonitorStage;
 import com.note.service.ai.pipeline.RAGContext;
 import com.note.service.ai.pipeline.RAGStage;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class QueryRewriteStage implements RAGStage {
     }
 
     @Override
+    @MonitorStage("rewrite")
     public void process(RAGContext ctx) {
         String question = ctx.getQuestion();
         List<Map<String, String>> history = ctx.getConversationHistory();

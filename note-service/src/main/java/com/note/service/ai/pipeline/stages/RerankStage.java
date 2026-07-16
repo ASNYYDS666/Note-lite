@@ -4,6 +4,7 @@ import com.note.service.ai.facade.AIFacadeFactory;
 import com.note.service.ai.facade.ChatToken;
 import com.note.service.ai.facade.LLMFacade;
 import com.note.service.ai.facade.VectorDoc;
+import com.note.service.ai.metrics.MonitorStage;
 import com.note.service.ai.pipeline.RAGContext;
 import com.note.service.ai.pipeline.RAGStage;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class RerankStage implements RAGStage {
     }
 
     @Override
+    @MonitorStage("rerank")
     public void process(RAGContext ctx) {
         List<VectorDoc> docs = ctx.getFilteredDocs();
         if (docs == null || docs.size() <= 1) {

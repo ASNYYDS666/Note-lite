@@ -17,8 +17,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
 import java.io.IOException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -32,6 +36,7 @@ public class ChatController {
     private final ConversationService conversationService;
     private final Executor chatExecutor;
     private final SSEConnectionMetrics sseMetrics;
+    private final MeterRegistry meterRegistry;
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "AI 对话（SSE 流式）")
@@ -54,6 +59,9 @@ public class ChatController {
                 String[] qidHolder = new String[1];
                 StringBuilder responseBuffer = new StringBuilder();
 
+                Timer.Sample ttftSample = Timer.start(meterRegistry);
+                AtomicBoolean firstToken = new AtomicBoolean(true);
+
                 chatService.ask(userId, request.getQuestion(),
                         request.getScopeType(), request.getScopeIds(), request.getStyle(),
                         request.getConversationId(), cidHolder, qidHolder,
@@ -61,6 +69,13 @@ public class ChatController {
                         .subscribe(
                                 token -> {
                                     try {
+                                        // 首个非 DONE token → 记录真实 TTFT
+                                        if (!token.isDone() && firstToken.compareAndSet(true, false)) {
+                                            ttftSample.stop(Timer.builder("rag.generation.ttft")
+                                                    .description("Flux subscribe → 首个 LLM token 延迟")
+                                                    .tag("type", token.thinking() ? "think" : "answer")
+                                                    .register(meterRegistry));
+                                        }
                                         if (token.isDone()) {
                                             emitter.send(SseEmitter.event()
                                                     .data("{\"done\":true,\"conversationId\":"

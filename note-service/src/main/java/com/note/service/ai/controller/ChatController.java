@@ -59,14 +59,17 @@ public class ChatController {
                 String[] qidHolder = new String[1];
                 StringBuilder responseBuffer = new StringBuilder();
 
-                Timer.Sample ttftSample = Timer.start(meterRegistry);
                 AtomicBoolean firstToken = new AtomicBoolean(true);
 
-                chatService.ask(userId, request.getQuestion(),
+                var flux = chatService.ask(userId, request.getQuestion(),
                         request.getScopeType(), request.getScopeIds(), request.getStyle(),
                         request.getConversationId(), cidHolder, qidHolder,
-                        request.getProfileId(), request.getModelName())
-                        .subscribe(
+                        request.getProfileId(), request.getModelName());
+
+                // 此时 Stage 1-5 已同步执行完毕，Flux 尚未订阅
+                // 从 subscribe 开始计时 = 纯 LLM 首 Token 延迟
+                Timer.Sample ttftSample = Timer.start(meterRegistry);
+                flux.subscribe(
                                 token -> {
                                     try {
                                         // 首个非 DONE token → 记录真实 TTFT
